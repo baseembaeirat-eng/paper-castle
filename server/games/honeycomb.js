@@ -57,7 +57,7 @@ module.exports = {
     for (const c of Object.values(cells)) for (let d = 0; d < 3; d++)
       if (!c.d[d] && cells[key(c.q + DIRS[d][0], c.r + DIRS[d][1])] && rnd() < 0.4) open(c, d);
     const mons = G.others.map((id, i) => ({ id, q: STARTS[i][0], r: STARTS[i][1], cd: 0 }));
-    for (let i = mons.length; i < 2; i++) mons.push({ id: 'bot' + i, bot: true, q: STARTS[i][0], r: STARTS[i][1], cd: 1.5 });
+    for (let i = mons.length; i < 2; i++) mons.push({ id: 'bot' + i, bot: true, q: STARTS[i][0], r: STARTS[i][1], cd: 6 }); // guard bots give the Runner a head start
     return { cells, mons, runner: { q: -3, r: 0, cd: 0 }, exit: { q: 3, r: 0 }, time: 90 };
   },
   input(s, pid, m, G) {
@@ -76,7 +76,7 @@ module.exports = {
         const c = s.cells[key(m.q, m.r)];
         let d = rnd() < 0.65 ? chase(s, m) : -1;
         if (d < 0) d = pick([0, 1, 2, 3, 4, 5].filter(x => c.d[x]));
-        step(s, m, d); m.cd = 1.15;
+        step(s, m, d); m.cd = 1.5;
       }
     }
     check(s);

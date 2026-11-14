@@ -111,7 +111,7 @@
             center = [260, 260]; hex(center, 200, v.d, 3, A.PAL.sand);
             v.d.forEach((open, k) => { if (!open) return; const a = (-k * Math.PI) / 3; A.txt(c, '➤', 260 + Math.cos(a) * 205, 260 + Math.sin(a) * 205, 44, { rot: a, color: A.PAL.brick }); });
             A.stick(c, 260, 310, 1.3, { ci: x.me.ci, emo: v.growl <= 1 ? 'shock' : v.growl <= 2 ? 'scared' : 'grit', t: performance.now() / 1000 });
-            msg.textContent = (v.growl <= 1 ? 'شيء ما يتنفس في الغرفة المجاورة تماماً!' : v.growl <= 2 ? 'تسمع مخالب على الحجر، قريباً منك…' : 'هدوء. حتى الآن.') + (v.far <= 2 ? ' فانوس يتوهّج جهة اليمين.' : '');
+            msg.textContent = 'اضغط على أحد الأسهم الحمراء لتعبر من الباب. ' + (v.growl <= 1 ? 'شيء ما يتنفس في الغرفة المجاورة تماماً!' : v.growl <= 2 ? 'تسمع مخالب على الحجر، قريباً منك…' : 'هدوء. حتى الآن.') + (v.far <= 2 ? ' فانوس يتوهّج جهة اليمين.' : '');
           } else {
             const s = 36, pos = (q, r) => [260 + s * Math.sqrt(3) * (q + r / 2), 260 + s * 1.5 * r];
             v.cells.forEach((cell, n) => hex(pos(cell.q, cell.r), s, cell.d, n * 20 + 1, cell.q === v.exit.q && cell.r === v.exit.r ? A.PAL.ochre : A.PAL.stone));
