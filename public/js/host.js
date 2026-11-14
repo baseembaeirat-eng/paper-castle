@@ -12,8 +12,50 @@
     joinUrl = (local && res.urls[0] ? res.urls[0] : location.origin).replace(/^https?:\/\//, '');
   });
   socket.on('connect', connect);
-  socket.on('lobby', d => { lobby = d; if (d.phase === 'lobby') gs = null; });
-  socket.on('state', d => { gs = d; });
+  socket.on('lobby', d => { if (lobby && d.players.length > lobby.players.length) Sfx.play('join'); lobby = d; if (d.phase === 'lobby') gs = null; });
+  socket.on('state', d => { hear(gs, d); gs = d; });
+
+  // ---- sound: every effect is derived from how the game state changed since the last update ----
+  const hexd = (a, b) => (Math.abs(a.q - b.q) + Math.abs(a.r - b.r) + Math.abs(a.q + a.r - b.q - b.r)) / 2;
+  const AMBIENT = { honeycomb: 'cave', stones: 'water', bridge: 'wind', avalanche: 'wind', rollers: 'water', dragon: 'water', mushroom: 'water' };
+  const HEAR = {
+    honeycomb(a, b, P) {
+      if (a.runner.q !== b.runner.q || a.runner.r !== b.runner.r) P('step');
+      if (b.mons.some((m, i) => m.q !== a.mons[i].q || m.r !== a.mons[i].r)) P('creep');
+      const near = v => v.mons.some(m => hexd(m, v.runner) <= 1);
+      if (near(b) && !near(a)) P('growl');
+    },
+    stones(a, b, P) { if ((b.jump && !a.jump) || (b.fin && !a.fin)) P('jump'); if (b.splash && !a.splash) P('splash'); if (b.row > a.row) P('land'); if (a.phase === 'setup' && b.phase === 'run') P('go'); },
+    bridge(a, b, P) {
+      const hits = v => v.balls.filter(x => x.hit).length, flying = v => v.balls.filter(x => x.t < 0.2).length;
+      if (flying(b) > flying(a)) P('cannon');
+      if (hits(b) > hits(a)) P('bonk');
+      if (Math.abs(b.b) > 0.65 && Math.abs(a.b) <= 0.65) P('creak');
+    },
+    knock(a, b, P) { if (b.anim && !a.anim) P('charge'); if (b.anim && b.anim.res && !(a.anim && a.anim.res)) P(b.anim.res === 'ok' ? 'rip' : 'thud'); if (a.phase === 'setup' && b.phase === 'run') P('go'); },
+    avalanche(a, b, P) { if (b.boul.length > a.boul.length) P('rumble'); if (b.hid !== a.hid) P('door'); if (b.run && Math.floor(b.time * 4) !== Math.floor(a.time * 4)) P('step'); },
+    rollers(a, b, P) { if (b.air && !a.air) P('jump'); if (a.air && !b.air) P('land'); if (b.om.some((o, i) => o !== a.om[i])) P('creak'); },
+    dragon(a, b, P) { if (a.phase !== b.phase) P(b.phase === 'done' ? (b.ok ? 'land' : 'splash') : 'whoosh'); if (b.gusts.length > a.gusts.length) P('gust'); },
+    mushroom(a, b, P) { b.ps.forEach((p, i) => { if (p.st !== a.ps[i].st) P(p.st === 'fly' ? 'whoosh' : p.st === 'safe' ? 'land' : 'splash'); }); },
+    hands(a, b, P) {
+      if (b.round !== a.round) P('card');
+      if (Object.keys(b.picks).length > Object.keys(a.picks).length) { P('slap'); P(b.winner && !a.winner ? 'correct' : 'wrong'); }
+    },
+    showdown(a, b, P) { if (b.shots.length > a.shots.length) P('squirt'); if (b.fx.length > a.fx.length) P('hit'); if (b.tanks.filter(t => t.alive).length < a.tanks.filter(t => t.alive).length) P('rip'); },
+  };
+  function hear(p, d) {
+    if (!p || p.seq !== d.seq) return Sfx.play('fanfare');
+    if (p.phase === 'play' && p.v && d.v) {
+      if (d.v.time !== undefined && d.v.time < 10 && Math.ceil(d.v.time) !== Math.ceil(p.v.time)) Sfx.play('tick');
+      try { HEAR[d.gid](p.v, d.v, Sfx.play); } catch (e) {}
+    }
+    if (p.phase === d.phase) return;
+    if (d.phase === 'play') Sfx.play('go');
+    else if (d.phase === 'result') Sfx.play(d.over.champion ? 'champion' : (d.kind === 'runner' ? d.over.win : Object.keys(d.awards || {}).length) ? 'win' : 'lose');
+  }
+  // Mandatory start button: browsers keep audio locked until the first click.
+  const startEl = document.getElementById('start');
+  startEl.querySelector('button').addEventListener('click', e => { e.stopPropagation(); Sfx.unlock(); Sfx.play('fanfare'); startEl.remove(); });
 
   const toLogical = e => { const r = cv.getBoundingClientRect(); return [((e.clientX - r.left) / r.width) * W, ((e.clientY - r.top) / r.height) * H]; };
   cv.addEventListener('mousemove', e => { mouse = toLogical(e); });
@@ -23,7 +65,7 @@
     const h = hits.find(r => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h);
     if (h) socket.emit('pick', { game: h.id });
   });
-  addEventListener('keydown', e => { if (e.key === 'Escape') socket.emit('abort'); if (e.key === 'f') document.documentElement.requestFullscreen?.(); });
+  addEventListener('keydown', e => { if (e.key === 'Escape') socket.emit('abort'); if (e.key === 'f') document.documentElement.requestFullscreen?.(); if (e.key === 'm' || e.key === 'M' || e.key === 'ة') Sfx.toggleMute(); });
 
   const who = id => { const p = lobby && lobby.players.find(x => x.id === id); return p ? { ci: p.ci, name: p.name } : { ci: 6 + (parseInt(String(id).slice(3)) || 0), name: 'حارس القلعة' }; };
   const mmss = s => { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
@@ -51,6 +93,7 @@
     }
     A.txt(c, lobby.players.length ? '★ عريف الحفل يختار اللعبة التالية من جهازه — أو انقر تذكرة هنا.' : 'بانتظار انضمام أول متسابق…', 800, 438, 26, { hand: true });
     // programme of ten games
+    A.txt(c, Sfx.muted() ? 'الصوت مكتوم — اضغط M لتشغيله' : 'اضغط M لكتم الصوت', 800, 884, 20, { hand: true, alpha: 0.6 });
     hits = [];
     lobby.games.forEach((g, i) => {
       const x = 60 + (i % 5) * 300, y = 468 + Math.floor(i / 5) * 208, w = 280, h = 190;
@@ -111,6 +154,8 @@
   function frame() {
     const t = (performance.now() - t0) / 1000;
     c.drawImage(paper, 0, 0);
+    Sfx.ambient(gs && gs.phase === 'play' ? AMBIENT[gs.gid] : null);
+    Sfx.music(!lobby ? null : !gs ? 'lobby' : gs.phase === 'result' ? null : 'game');
     if (!lobby) A.txt(c, 'نفتح أبواب القلعة…', 800, 450, 48, { hand: true });
     else if (!gs) drawLobby(t);
     else if (gs.phase === 'intro') drawIntro(t);

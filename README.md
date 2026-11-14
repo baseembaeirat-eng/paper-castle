@@ -48,6 +48,8 @@ public/
   play.html/.css    phone controller
   js/art.js         paper texture, washes, ink, the Stickman (emotions, 4 directions, poses)
   js/scenes.js      one main-screen renderer per game
+  js/sfx.js         SoundManager: recordings from public/sounds/ with synthesised fallbacks, music, room tone
+  sounds/           optional MP3s that replace the synthesised sounds (see sounds/README.md)
   js/host.js        lobby, title cards, HUD, results
   js/play.js        join flow and one control surface per game
 ```

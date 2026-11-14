@@ -16,6 +16,11 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+// Lists the recordings present in public/sounds so clients only request files that exist.
+app.get('/sounds/index.json', (req, res) => {
+  require('fs').readdir(path.join(__dirname, '..', 'public', 'sounds'), (err, files) =>
+    res.json(err ? [] : files.filter(f => /\.(mp3|ogg|wav|m4a)$/i.test(f))));
+});
 app.use(express.static(path.join(__dirname, '..', 'public'), { extensions: ['html'] }));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'play.html')));
 

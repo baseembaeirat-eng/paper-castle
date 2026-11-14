@@ -47,9 +47,35 @@
   socket.on('connect', () => { const code = store.get('pc_code'); if (code && store.get('pc_token_' + code)) join(code, store.get('pc_name'), true); else showJoin(''); });
   socket.on('disconnect', () => { if (cleanup) { cleanup(); cleanup = null; } sig = ''; app.replaceChildren(waitScreen('انقطع الاتصال بالقلعة…', 'نعيد الاتصال.')); });
 
+  // ---- sound and vibration on the phone ----------------------------------------------
+  Sfx.only(['tap', 'fanfare', 'go', 'win', 'lose', 'champion', 'growl', 'hit', 'correct', 'wrong']);
+  document.addEventListener('pointerdown', e => {
+    Sfx.unlock();
+    if (e.target.closest && e.target.closest('button:not(:disabled), canvas, .pad')) { Sfx.play('tap'); Sfx.buzz(12); }
+  }, true);
+  function feel(p, d) {
+    if (!p) return;
+    if (p.phase !== d.phase) {
+      if (d.phase === 'intro') { Sfx.play('fanfare'); Sfx.buzz(60); }
+      else if (d.phase === 'play') Sfx.play('go');
+      else if (d.phase === 'result') { Sfx.play(d.champion ? 'champion' : d.got ? 'win' : 'lose'); Sfx.buzz(d.got ? [60, 40, 60, 40, 160] : 250); }
+      return;
+    }
+    const a = p.v, b = d.v;
+    if (d.phase !== 'play' || !a || !b) return;
+    const hurt = () => { Sfx.play('hit'); Sfx.buzz(140); };
+    if (b.growl !== undefined && b.growl <= 1 && a.growl > 1) { Sfx.play('growl'); Sfx.buzz([90, 50, 90]); } // a monster next door
+    if (b.lives < a.lives || b.hp < a.hp) hurt();
+    if (b.won && !a.won) Sfx.play('correct');
+    if (b.pick >= 0 && a.pick < 0 && !b.won) { Sfx.play('wrong'); Sfx.buzz(120); }
+    if (b.ui !== a.ui && (b.ui === 'splash' || b.ui === 'd')) hurt();
+    if (b.ui !== a.ui && b.ui === 'safe') Sfx.play('win');
+  }
+
   // ---- screen routing ---------------------------------------------------------------
   socket.on('p', d => {
     if (!joined) return;
+    feel(cur, d);
     cur = d;
     const s = [d.phase, d.gid, d.role, d.seq, d.vip, d.v && d.v.ui].join('|');
     if (s !== sig) {
