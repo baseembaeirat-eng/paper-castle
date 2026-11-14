@@ -39,6 +39,6 @@ canvas{width:100%;display:block;touch-action:none}
 /* the game list is long: let it scroll, and pick on a full tap rather than on touch-down */
 .menu button{touch-action:pan-y;min-height:46px;font-size:15px}
 .pad span{font-size:19px;padding:0 10px}
-/* bottom navigation bar */
-.nav{display:flex;gap:8px;justify-content:center;margin-top:auto;padding-top:6px;border-top:1.5px dashed rgba(43,38,34,.4)}
-.nav button{font-size:14px;min-height:38px;padding:6px 10px;touch-action:manipulation;box-shadow:none;background:rgba(243,234,214,.7);border-width:1.5px}
+/* navigation bar under the header */
+.nav{display:flex;gap:8px;justify-content:center;margin-top:-6px}
+.nav button{font-size:13px;min-height:32px;padding:3px 10px;touch-action:manipulation;box-shadow:none;background:rgba(243,234,214,.7);border-width:1.5px}

@@ -82,13 +82,13 @@
       sig = s;
       if (cleanup) { cleanup(); cleanup = null; }
       view = mount(d);
-      app.replaceChildren(header(d), ...[].concat(view.el), nav(d));
+      app.replaceChildren(header(d), nav(d), ...[].concat(view.el));
     }
     app.firstChild.replaceWith(header(d));
     if (view.update) view.update(d);
   });
 
-  // Bottom bar on every screen: leave the room, and for the Master of Ceremonies, back / next.
+  // Bar under the header on every screen: leave the room, and for the Master of Ceremonies, back / next.
   function leave() {
     if (!confirm('هل تريد الخروج من الغرفة؟')) return;
     socket.emit('leave');
