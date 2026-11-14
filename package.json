@@ -1,0 +1,17 @@
+{
+  "name": "paper-castle",
+  "version": "1.0.0",
+  "description": "Asymmetric multiplayer party game platform: 10 castle-assault mini-games, phones as controllers, one shared 16:9 screen.",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "private": true
+}

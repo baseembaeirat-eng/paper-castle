@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>قلعة الورق — الشاشة الرئيسية</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;800&family=Tajawal:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;height:100%;background:#2a241f;overflow:hidden}
+  body{display:flex;align-items:center;justify-content:center}
+  /* 16:9 stage, letterboxed on any other screen shape */
+  canvas{width:min(100vw,calc(100vh*16/9));height:min(100vh,calc(100vw*9/16));display:block;cursor:pointer;box-shadow:0 0 60px rgba(0,0,0,.6)}
+</style>
+</head>
+<body>
+<canvas dir="ltr" id="stage" width="1600" height="900"></canvas>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/js/art.js"></script>
+<script src="/js/scenes.js"></script>
+<script src="/js/host.js"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+# Render blueprint (free plan). Rooms live in memory, so keep a single instance.
+services:
+  - type: web
+    name: paper-castle
+    runtime: node
+    plan: free
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /host
+    numInstances: 1
