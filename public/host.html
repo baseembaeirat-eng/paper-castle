@@ -14,9 +14,21 @@
   #start button{font:inherit;font-size:44px;font-weight:800;color:#2b2622;background:#c59a4a;border:4px solid #2b2622;border-radius:255px 18px 225px 18px/18px 225px 18px 255px;padding:22px 60px;cursor:pointer;box-shadow:4px 6px 0 rgba(0,0,0,.45)}
   #start button:active{transform:translate(3px,5px);box-shadow:none}
   #start p{font-size:22px;margin:0;opacity:.85}
+  /* corner controls: back, next, leave, sound, fullscreen */
+  #nav{position:fixed;left:10px;bottom:10px;display:flex;gap:8px;z-index:4;opacity:.5;transition:opacity .15s;font-family:'Cairo','Tajawal','Segoe UI',Tahoma,sans-serif}
+  #nav:hover{opacity:1}
+  #nav button{font:inherit;font-size:15px;font-weight:700;color:#2b2622;background:#eadfc6;border:2px solid #2b2622;border-radius:10px;padding:6px 12px;cursor:pointer}
+  #nav button:disabled{opacity:.35;cursor:default}
 </style>
 </head>
 <body>
+<div id="nav">
+  <button type="button" id="nav-back">→ رجوع للردهة</button>
+  <button type="button" id="nav-next">التالي ←</button>
+  <button type="button" id="nav-leave">خروج · غرفة جديدة</button>
+  <button type="button" id="nav-mute">كتم الصوت</button>
+  <button type="button" id="nav-full">ملء الشاشة</button>
+</div>
 <div id="start"><button type="button">▶ ابدأ اللعبة</button><p>اضغط لتشغيل الصوت والموسيقى · M للكتم · F لملء الشاشة</p></div>
 <canvas dir="ltr" id="stage" width="1600" height="900"></canvas>
 <script src="/socket.io/socket.io.js"></script>

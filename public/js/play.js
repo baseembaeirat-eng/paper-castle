@@ -82,11 +82,29 @@
       sig = s;
       if (cleanup) { cleanup(); cleanup = null; }
       view = mount(d);
-      app.replaceChildren(header(d), ...[].concat(view.el));
+      app.replaceChildren(header(d), ...[].concat(view.el), nav(d));
     }
     app.firstChild.replaceWith(header(d));
     if (view.update) view.update(d);
   });
+
+  // Bottom bar on every screen: leave the room, and for the Master of Ceremonies, back / next.
+  function leave() {
+    if (!confirm('هل تريد الخروج من الغرفة؟')) return;
+    socket.emit('leave');
+    const code = store.get('pc_code');
+    try { localStorage.removeItem('pc_token_' + code); } catch (e) {}
+    if (cleanup) { cleanup(); cleanup = null; }
+    cur = null; showJoin('');
+  }
+  function nav(d) {
+    const b = (label, fn) => h('button', { type: 'button', onclick: fn }, label);
+    const inGame = d.phase === 'intro' || d.phase === 'play' || d.phase === 'result';
+    return h('div', { class: 'nav' },
+      b('خروج من الغرفة', leave),
+      d.vip && inGame ? b('→ رجوع للردهة', () => socket.emit(d.phase === 'result' ? 'back' : 'abort')) : null,
+      d.vip && d.phase === 'intro' ? b('التالي ←', () => socket.emit('skip')) : null);
+  }
 
   function mount(d) {
     if (d.phase === 'lobby') return lobbyView(d);

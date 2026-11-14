@@ -7,10 +7,25 @@
   let lobby = null, gs = null, joinUrl = location.host, bg = { seq: -1, cv: null }, hits = [], mouse = [0, 0];
   const t0 = performance.now();
 
-  const connect = () => socket.emit('host:create', { code: lobby ? lobby.code : new URLSearchParams(location.search).get('code') }, res => {
+  // The room code is remembered, so reloading the page returns to the same room and scores.
+  const saved = { get: () => { try { return localStorage.getItem('pc_host_code'); } catch (e) { return null; } }, set: v => { try { v ? localStorage.setItem('pc_host_code', v) : localStorage.removeItem('pc_host_code'); } catch (e) {} } };
+  const connect = () => socket.emit('host:create', { code: lobby ? lobby.code : new URLSearchParams(location.search).get('code') || saved.get() }, res => {
     const local = ['localhost', '127.0.0.1'].includes(location.hostname);
     joinUrl = (local && res.urls[0] ? res.urls[0] : location.origin).replace(/^https?:\/\//, '');
+    saved.set(res.code);
+    try { history.replaceState(null, '', '/host?code=' + res.code); } catch (e) {}
   });
+
+  // Corner buttons: every action that used to need a key or a canvas click.
+  const $ = id => document.getElementById(id);
+  const stop = fn => e => { e.stopPropagation(); e.currentTarget.blur(); fn(); };
+  $('nav-back').addEventListener('click', stop(() => socket.emit(gs && gs.phase === 'result' ? 'back' : 'abort')));
+  $('nav-next').addEventListener('click', stop(() => { if (gs) socket.emit(gs.phase === 'intro' ? 'skip' : gs.phase === 'result' ? 'back' : ''); }));
+  $('nav-leave').addEventListener('click', stop(() => { if (confirm('الخروج من هذه الغرفة وفتح غرفة جديدة؟ ستُفقد النقاط.')) { saved.set(null); location.href = '/host'; } }));
+  $('nav-mute').addEventListener('click', stop(() => { Sfx.unlock(); $('nav-mute').textContent = Sfx.toggleMute() ? 'تشغيل الصوت' : 'كتم الصوت'; }));
+  $('nav-full').addEventListener('click', stop(() => { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.(); }));
+  setInterval(() => { $('nav-back').disabled = !gs; $('nav-next').disabled = !gs || gs.phase === 'play'; }, 250);
+
   socket.on('connect', connect);
   socket.on('lobby', d => { if (lobby && d.players.length > lobby.players.length) Sfx.play('join'); lobby = d; if (d.phase === 'lobby') gs = null; });
   socket.on('state', d => { hear(gs, d); gs = d; });

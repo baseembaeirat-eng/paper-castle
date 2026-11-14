@@ -179,6 +179,14 @@ io.on('connection', sock => {
   sock.on('pick', m => { const { room, boss } = ctx(); if (room && boss && m) startGame(room, m.game); });
   sock.on('skip', () => { const { room, boss } = ctx(); if (room && boss && room.game && room.game.phase === 'intro') { room.game.phase = 'play'; room.game.t = 0; } });
   sock.on('back', () => { const { room, boss } = ctx(); if (room && boss && room.game && room.game.phase === 'result') room.game = null; });
+  // A player walks out for good: forget their seat so the same phone can join afresh.
+  sock.on('leave', () => {
+    const { room, player } = ctx();
+    if (!player) return;
+    player.on = false; player.sock = null; player.token = null; player.left = true;
+    sock.data.pid = null;
+    if (!room.game) room.players.delete(player.id);
+  });
   sock.on('abort', () => { const { room, boss } = ctx(); if (room && boss) room.game = null; });
 
   sock.on('in', m => {
@@ -205,7 +213,7 @@ setInterval(() => {
     // Drop players who stay disconnected in the lobby, and rooms nobody is watching.
     for (const p of [...room.players.values()]) {
       p.away = p.on ? 0 : p.away + dt;
-      if (!room.game && p.away > 90) room.players.delete(p.id);
+      if (!room.game && (p.away > 90 || p.left)) room.players.delete(p.id);
     }
     const hosts = io.sockets.adapter.rooms.get(room.code + ':host');
     const live = (hosts && hosts.size) || [...room.players.values()].some(p => p.on);
