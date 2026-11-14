@@ -8,7 +8,9 @@ module.exports = {
   runnerTip: 'اختر باباً واحداً في كل جدار واندفع. الورق يتمزق، أمّا الخشب فلا.',
   othersTip: 'في كل جدار يخصّك اختر الباب الورقي الوحيد. الثلاثة الباقية مقفلة بإحكام.',
   create(G) {
-    const s = { phase: 'setup', t: 20, wall: 0, open: [], owner: [], ready: {}, anim: null, hist: [], time: 45 };
+    const L = (G.level || 1) - 1; // 0 on the first stage, up to 5
+    const WALLS = 3 + (L >= 2) + (L >= 4); // later stages: more walls
+    const s = { phase: 'setup', t: 20, wall: 0, open: [], owner: [], ready: {}, anim: null, hist: [], time: 45 - 4 * L, n: WALLS };
     for (let w = 0; w < WALLS; w++) { s.open.push(Math.floor(rnd() * DOORS)); s.owner.push(G.others.length ? G.others[w % G.others.length] : null); }
     return s;
   },
@@ -17,7 +19,7 @@ module.exports = {
       if (pid === G.runnerId) return;
       if (m.ready) { s.ready[pid] = 1; if (G.others.every(id => s.ready[id])) s.phase = 'run'; return; }
       const w = m.wall | 0, d = m.door | 0;
-      if (w >= 0 && w < WALLS && d >= 0 && d < DOORS && s.owner[w] === pid) s.open[w] = d;
+      if (w >= 0 && w < s.n && d >= 0 && d < DOORS && s.owner[w] === pid) s.open[w] = d;
     } else if (pid === G.runnerId && !s.anim) {
       const d = m.door | 0;
       if (d >= 0 && d < DOORS) s.anim = { door: d, t: 0, res: null };
@@ -31,11 +33,11 @@ module.exports = {
     if (a.t >= 1 && !a.res) { a.res = a.door === s.open[s.wall] ? 'ok' : 'no'; s.hist.push(a.res === 'ok'); }
     if (a.t >= 2) {
       if (a.res === 'no') s.over = { win: false, text: 'طاخ! بلّوط صلب. العدّاء يرى النجوم.' };
-      else { s.wall++; s.anim = null; if (s.wall >= WALLS) s.over = { win: true, text: 'اخترق كل الجدران! يا له من رأس.' }; }
+      else { s.wall++; s.anim = null; if (s.wall >= s.n) s.over = { win: true, text: 'اخترق كل الجدران! يا له من رأس.' }; }
     }
   },
   view(s) {
-    return { phase: s.phase, wall: Math.min(s.wall, WALLS - 1), anim: s.anim, hist: s.hist, n: WALLS, time: s.phase === 'run' ? s.time : s.t, owner: s.owner, open: s.over ? s.open : null };
+    return { phase: s.phase, wall: Math.min(s.wall, s.n - 1), anim: s.anim, hist: s.hist, n: s.n, time: s.phase === 'run' ? s.time : s.t, owner: s.owner, open: s.over ? s.open : null };
   },
   pview(s, pid, G) {
     if (pid === G.runnerId) return { ui: s.phase, wall: s.wall, busy: !!s.anim };

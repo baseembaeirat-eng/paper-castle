@@ -1,17 +1,17 @@
 // 13. Skittles — one player steers a giant bowling ball; everyone else is a pin, dodging by tilt.
 const { rnd, clamp, r3 } = require('./util');
-const BALLS = 4, PIN_Y = 0.9, HIT = 0.3;
+const BALLS = 4, PIN_Y = 0.9;
 
 module.exports = {
-  id: 'skittles', name: 'البولينغ البشري', kind: 'runner', tag: 'واحد ضد الجميع',
+  id: 'skittles', name: 'البولينغ البشري', kind: 'runner', tag: 'واحد ضد الجميع', sides: ['صاحب الكرة', 'القناني'],
   blurb: 'لاعب واحد يدحرج كرة عملاقة، والبقية قناني بولينغ تتمايل لتنجو.',
   runnerTip: 'أنت صاحب الكرة. اسحب لتصوّب ثم اضغط «ارمِ»، ووجّه الكرة وهي تتدحرج. أسقط نصف القناني على الأقل بأربع كرات.',
   othersTip: 'أنت قنّينة بولينغ! أمِل جهازك يميناً ويساراً (أو اسحب الشريط) لتهرب من الكرة.',
   create(G) {
     const ids = G.others.length ? G.others.slice() : ['bot0', 'bot1', 'bot2'];
-    const n = ids.length;
+    const n = ids.length, L = (G.level || 1) - 1; // later stages: a narrower ball and more pins to knock down
     return {
-      phase: 'aim', t: 8, balls: BALLS, steer: 0, ball: { x: 0, y: 0 }, need: Math.ceil(n / 2), strike: 0,
+      phase: 'aim', t: 8, balls: BALLS, steer: 0, ball: { x: 0, y: 0 }, need: Math.min(n, Math.ceil(n * (0.5 + 0.08 * L))), hit: 0.3 - 0.03 * L, strike: 0,
       pins: ids.map((id, i) => ({ id, bot: id.startsWith('bot'), x: n === 1 ? 0 : -0.7 + (1.4 * i) / (n - 1), tilt: 0, up: true, aim: 0 })),
     };
   },
@@ -42,7 +42,7 @@ module.exports = {
       const before = b.y;
       b.y += dt / 1.9; b.x = clamp(b.x + s.steer * 0.5 * dt, -0.9, 0.9);
       if (before < PIN_Y && b.y >= PIN_Y) {
-        const hit = s.pins.filter(p => p.up && Math.abs(p.x - b.x) < HIT);
+        const hit = s.pins.filter(p => p.up && Math.abs(p.x - b.x) < s.hit);
         hit.forEach(p => { p.up = false; });
         s.strike = hit.length;
       }

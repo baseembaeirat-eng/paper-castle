@@ -3,7 +3,7 @@ const { rnd, clamp, r3 } = require('./util');
 
 function bout(s) {
   const [a, b] = s.bouts[s.i];
-  Object.assign(s, { a, b, pos: 0, vel: 0, phase: 'ready', t: 2.5, time: 15, winner: null, bot: 0 });
+  Object.assign(s, { a, b, pos: 0, vel: 0, phase: 'ready', t: 2.5, time: 15 - s.L, winner: null, bot: 0 });
 }
 
 module.exports = {
@@ -11,9 +11,10 @@ module.exports = {
   blurb: 'نزالات سريعة وجهاً لوجه. ادفع خصمك خارج الحلبة قبل أن يدفعك.',
   runnerTip: 'نزالات ثنائية بالدور. حين يأتي دورك اضغط الزر بأسرع ما تستطيع لتدفع خصمك خارج الحلبة.',
   create(G) {
+    const L = (G.level || 1) - 1;
     const ids = G.ids.slice();
     if (ids.length % 2) ids.push('bot0'); // the odd one out wrestles a castle guard
-    const s = { bouts: [], i: 0, last: {}, wins: {}, results: [] };
+    const s = { bouts: [], i: 0, last: {}, wins: {}, results: [], L, push: 0.085 * (1 + 0.12 * L) }; // later stages: slippier ring, shorter bouts
     for (let i = 0; i < ids.length; i += 2) s.bouts.push([ids[i], ids[i + 1]]);
     bout(s);
     return s;
@@ -23,7 +24,7 @@ module.exports = {
     const now = Date.now();
     if (now - (s.last[pid] || 0) < 45) return;
     s.last[pid] = now;
-    s.vel += pid === s.a ? 0.085 : -0.085;
+    s.vel += pid === s.a ? s.push : -s.push;
   },
   tick(s, dt, G) {
     s.t -= dt;
@@ -37,7 +38,7 @@ module.exports = {
       return;
     }
     s.time -= dt;
-    if (s.b.startsWith('bot') && (s.bot -= dt) <= 0) { s.bot = 0.15 + rnd() * 0.15; s.vel -= 0.085; }
+    if (s.b.startsWith('bot') && (s.bot -= dt) <= 0) { s.bot = 0.15 + rnd() * 0.15; s.vel -= s.push; }
     s.vel *= 1 - 3 * dt;
     s.pos = clamp(s.pos + s.vel * dt, -1, 1);
     if (Math.abs(s.pos) < 1 && s.time > 0) return;

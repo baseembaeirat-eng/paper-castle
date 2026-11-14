@@ -39,7 +39,7 @@ const Scenes = (() => {
       const s = hx(-3, 0), e = hx(v.exit.q, v.exit.r);
       A.txt(c, 'البداية', s[0] - 95, s[1], 30, { hand: true }); A.ink(c, [[s[0] - 62, s[1]], [s[0] - 50, s[1]]], 4, { w: 2 });
       A.txt(c, 'باب الفانوس', e[0] + 150, e[1], 30, { hand: true });
-      A.wrap(c, 'أيها العدّاء — عينك على غرفتك فقط. الوحوش ترى كل شيء.', 170, 150, 24, 250, { hand: true, alpha: 0.75 });
+      A.wrap(c, 'العدّاء مختفٍ عن هذه الشاشة، ويظهر فقط حين يقترب منه وحش.', 170, 150, 24, 250, { hand: true, alpha: 0.75 });
     },
     draw(c, v, S) {
       const e = hx(v.exit.q, v.exit.r), fl = 0.5 + 0.5 * Math.sin(S.t * 9);
@@ -49,7 +49,8 @@ const Scenes = (() => {
       const at = (q, r) => { const k = q + ',' + r, n = slots[k] = (slots[k] || 0) + 1, p = hx(q, r); return [p[0] + (n - 1) * 16 - 4, p[1] + 26]; };
       v.mons.forEach((m, i) => { const p = at(m.q, m.r); A.stick(c, p[0], p[1], 0.5, { ci: S.who(m.id).ci, emo: 'angry', horns: true, pose: 'cheer', t: S.t + i }); });
       const caught = v.mons.some(m => m.q === v.runner.q && m.r === v.runner.r), p = at(v.runner.q, v.runner.r);
-      A.stick(c, p[0], p[1], 0.5, { ci: S.who(S.runnerId).ci, emo: caught ? 'shock' : 'scared', pose: caught ? 'fall' : 'stand', t: S.t });
+      // the Runner is only drawn once a hunter is next door (or the game is over), so nobody can track them on the big screen
+      if (v.seen || S.over) A.stick(c, p[0], p[1], 0.5, { ci: S.who(S.runnerId).ci, emo: caught ? 'shock' : 'scared', pose: caught ? 'fall' : 'stand', t: S.t });
     },
   };
 
@@ -296,9 +297,10 @@ const Scenes = (() => {
 
   // 10 ── Final Showdown ───────────────────────────────────────────────────────────────
   const showdown = {
-    bg(c) {
+    bg(c, v) {
       A.wash(c, A.rect(70, 100, 1460, 740), P.sand, 451, { alpha: 0.34, amp: 8 });
-      A.ink(c, A.rect(70, 100, 1460, 740), 452, { closed: true, w: 5, color: P.umber, amp: 3 }); A.ink(c, A.rect(82, 112, 1436, 716), 453, { closed: true, w: 1.6, alpha: 0.5 });
+      A.ink(c, A.rect(70, 100, 1460, 740), 452, { closed: true, w: 5, color: P.umber, amp: 3 });
+      (v.obs || []).forEach((o, i) => { A.wash(c, A.circ(o.x, o.y, o.r, 12), P.umber, 700 + i, { alpha: 0.6, amp: 2 }); A.ink(c, A.circ(o.x, o.y, o.r, 12), 720 + i, { closed: true, w: 3.2 }); A.ink(c, A.circ(o.x, o.y, o.r * 0.6, 10), 740 + i, { closed: true, w: 1.6, alpha: 0.6 }); A.ink(c, [[o.x - o.r, o.y], [o.x + o.r, o.y]], 760 + i, { w: 1.4, alpha: 0.5 }); }); A.ink(c, A.rect(82, 112, 1436, 716), 453, { closed: true, w: 1.6, alpha: 0.5 });
       for (const [x, y] of [[70, 100], [1530, 100], [70, 840], [1530, 840]]) { A.wash(c, A.circ(x, y, 18), P.umber, 454 + x + y, { alpha: 0.6, amp: 2 }); A.ink(c, A.circ(x, y, 18), 455 + x, { closed: true, w: 3 }); }
       const r = A.rng(456); for (let i = 0; i < 40; i++) { const x = 120 + r() * 1360, y = 140 + r() * 660, a = r() * TAU; A.ink(c, [[x, y], [x + Math.cos(a) * 60, y + Math.sin(a) * 60], [x + Math.cos(a + 0.6) * 110, y + Math.sin(a + 0.6) * 110]], 460 + i, { w: 1.3, alpha: 0.16 }); }
     },
@@ -353,7 +355,7 @@ const Scenes = (() => {
         else A.stick(c, x, y, 0.95, { ci, dir: side ? 'left' : 'right', emo: lost ? 'shock' : done ? 'happy' : pulling ? 'grit' : 'smug', pose: done && !lost ? 'cheer' : pulling ? 'run' : 'stand', rot: done ? 0 : side ? 0.32 : -0.32, t: S.t * (pulling ? 1.6 : 1) + i });
         tag(c, S, id, x, y + 34, 24);
       }));
-      A.txt(c, 'الفريق الأيسر', 250, 190, 36, { bold: true }); A.txt(c, 'الفريق الأيمن', 1350, 190, 36, { bold: true });
+      A.txt(c, v.names[0], 250, 190, 40, { bold: true, max: 420 }); A.txt(c, v.names[1], 1350, 190, 40, { bold: true, max: 420 });
       if (v.phase === 'ready') A.txt(c, `استعدّوا… ${Math.ceil(v.t)}`, 800, 300, 80, { bold: true });
       else if (!done) A.txt(c, 'اسحبوا!', 800, 300, 80 + Math.sin(S.t * 12) * 6, { bold: true, color: P.brick });
     },

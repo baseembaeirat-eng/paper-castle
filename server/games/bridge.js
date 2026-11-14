@@ -7,11 +7,12 @@ module.exports = {
   runnerTip: 'أمِل جهازك يميناً ويساراً لتبقى واقفاً (أو اسحب شريط التوازن). كلما ثبتّ صعدت أسرع.',
   othersTip: 'اضغط «أطلق» لترمي قذيفة على العدّاء. اختر التوقيت الذي يُسقطه.',
   create(G) {
-    return { p: 0, b: 0, bv: 0, n: 0, tilt: 0, balls: [], cds: {}, side: Object.fromEntries(G.others.map((id, i) => [id, i % 2 ? 1 : -1])), bot: G.others.length ? 0 : 3, time: 60 };
+    const L = (G.level || 1) - 1; // 0 on the first stage, up to 5
+    return { p: 0, b: 0, bv: 0, n: 0, tilt: 0, balls: [], cds: {}, side: Object.fromEntries(G.others.map((id, i) => [id, i % 2 ? 1 : -1])), bot: G.others.length && L < 3 ? 0 : 3, L, time: 60 };
   },
   input(s, pid, m, G) {
     if (pid === G.runnerId) { if (typeof m.tilt === 'number' && isFinite(m.tilt)) s.tilt = clamp(m.tilt, -1, 1); return; }
-    if (m.fire && (s.cds[pid] || 0) <= 0) { s.cds[pid] = 2.5; s.balls.push({ side: s.side[pid], tx: s.p + 0.03, t: 0 }); }
+    if (m.fire && (s.cds[pid] || 0) <= 0) { s.cds[pid] = 2.5 - 0.25 * s.L; s.balls.push({ side: s.side[pid], tx: s.p + 0.03, t: 0 }); }
   },
   tick(s, dt) {
     s.time -= dt;
@@ -20,8 +21,9 @@ module.exports = {
     // Sway builds over the first seconds and gets worse the higher the Runner climbs.
     s.age = (s.age || 0) + dt;
     const ease = Math.min(1, s.age / 4);
-    s.n = clamp(s.n + (rnd() - 0.5) * 7 * dt, -0.8, 0.8);
-    s.bv += ((0.7 + 1.3 * s.p) * s.b * ease + 4 * s.tilt + s.n * ease) * dt;
+    const rough = 1 + 0.18 * s.L; // later stages: the bridge sways harder
+    s.n = clamp(s.n + (rnd() - 0.5) * 7 * rough * dt, -0.8 * rough, 0.8 * rough);
+    s.bv += ((0.7 + 1.3 * s.p) * rough * s.b * ease + 4 * s.tilt + s.n * ease) * dt;
     s.bv *= 1 - 1.5 * dt;
     s.b += s.bv * dt;
     s.p += 0.05 * (1 - Math.min(1, Math.abs(s.b))) * dt;

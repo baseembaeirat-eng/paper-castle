@@ -7,10 +7,19 @@ module.exports = {
   blurb: 'كل عربة لنفسها. بلّلوا الحلقات الورقية، وصاحب آخر حلقة سليمة يفوز بالقلعة.',
   runnerTip: 'اسحب لوحة التوجيه لتقود وتصوّب، واضغط «رُشّ» لتطلق الماء. ثلاث رشّات تمزّق حلقتك الورقية.',
   create(G) {
+    const L = (G.level || 1) - 1; // 0 on the first stage, up to 5
+    // later stages: barrels in the arena that block carts and water
+    const obs = [];
+    for (let tries = 0; obs.length < 2 * L && tries < 200; tries++) {
+      const o = { x: Math.round(250 + rnd() * 1100), y: Math.round(230 + rnd() * 480), r: 36 };
+      const ring = Math.hypot((o.x - 800) / 480, (o.y - 470) / 250);
+      if (ring > 0.75 && ring < 1.25) continue; // keep the starting circle clear
+      if (obs.every(q => Math.hypot(q.x - o.x, q.y - o.y) > 130)) obs.push(o);
+    }
     const ids = G.ids.slice();
     for (let i = 0; ids.length < 3; i++) ids.push('bot' + i);
     return {
-      time: 90, shots: [], fx: [], out: [],
+      time: 90, shots: [], fx: [], out: [], obs,
       tanks: ids.map((id, i) => {
         const a = (Math.PI * 2 * i) / ids.length;
         return { id, bot: id.startsWith('bot'), x: 800 + 480 * Math.cos(a), y: 470 + 250 * Math.sin(a), a: a + Math.PI, vx: 0, vy: 0, jx: 0, jy: 0, fire: false, cd: 1, hp: HP, alive: true, inv: 0 };
@@ -43,6 +52,7 @@ module.exports = {
       t.vx += (jx * 250 - t.vx) * k; t.vy += (jy * 250 - t.vy) * k;
       if (mag > 0.2) { const want = Math.atan2(jy, jx); t.a += Math.atan2(Math.sin(want - t.a), Math.cos(want - t.a)) * Math.min(1, 10 * dt); }
       t.x = clamp(t.x + t.vx * dt, X0, X1); t.y = clamp(t.y + t.vy * dt, Y0, Y1);
+      for (const o of s.obs) { const dx = t.x - o.x, dy = t.y - o.y, d = Math.hypot(dx, dy) || 1, min = o.r + 30; if (d < min) { t.x = o.x + (dx / d) * min; t.y = o.y + (dy / d) * min; } }
       t.cd -= dt; t.inv -= dt;
       if (t.fire && t.cd <= 0) {
         t.cd = 0.5;
@@ -58,6 +68,7 @@ module.exports = {
       }
     }
     for (const sh of s.shots) {
+      if (s.obs.some(o => Math.hypot(o.x - sh.x, o.y - sh.y) < o.r + 6)) { sh.life = 0; s.fx.push({ x: r1(sh.x), y: r1(sh.y), t: 0 }); }
       sh.x += sh.vx * dt; sh.y += sh.vy * dt; sh.life -= dt;
       if (sh.x < X0 - 40 || sh.x > X1 + 40 || sh.y < Y0 - 40 || sh.y > Y1 + 40) sh.life = 0;
       for (const t of live) {
@@ -86,7 +97,7 @@ module.exports = {
   view(s) {
     return {
       tanks: s.tanks.map(t => ({ id: t.id, x: r1(t.x), y: r1(t.y), a: r1(t.a * 10) / 10, hp: t.hp, alive: t.alive, inv: t.inv > 0 })),
-      shots: s.shots.map(sh => ({ x: r1(sh.x), y: r1(sh.y) })), fx: s.fx, time: Math.max(0, s.time),
+      shots: s.shots.map(sh => ({ x: r1(sh.x), y: r1(sh.y) })), fx: s.fx, obs: s.obs, time: Math.max(0, s.time),
     };
   },
   pview(s, pid) { const t = s.tanks.find(x => x.id === pid); return { ui: t.alive ? 'a' : 'd', hp: t.hp }; },

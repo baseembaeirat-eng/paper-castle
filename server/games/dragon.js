@@ -14,7 +14,8 @@ module.exports = {
   runnerTip: 'اضغط مرة لتقفز عن الجرف متعلقاً بالحبل، واضغط ثانية لتُفلته — والزخم يكمل الباقي.',
   othersTip: 'انفخ هبّات ريح يميناً أو يساراً لتحرف العدّاء عن مساره في الهواء.',
   create(G) {
-    return { phase: 'ready', th: -1.1, w: 0, x: PX + L * Math.sin(-1.1), y: PY + L * Math.cos(-1.1), vx: 0, vy: 0, gusts: [], cds: {}, pad: { x: Math.round(1150 + rnd() * 300), r: 75 }, time: 12, swingT: 0, bot: !G.others.length };
+    const L = (G.level || 1) - 1; // 0 on the first stage, up to 5
+    return { phase: 'ready', th: -1.1, w: 0, x: PX + L * Math.sin(-1.1), y: PY + L * Math.cos(-1.1), vx: 0, vy: 0, gusts: [], cds: {}, pad: { x: Math.round(1150 + rnd() * 300), r: 75 - 8 * L }, L, time: 12, swingT: 0, bot: !G.others.length || L >= 3 };
   },
   input(s, pid, m, G) {
     if (pid === G.runnerId) {
@@ -24,7 +25,7 @@ module.exports = {
       return;
     }
     const d = m.gust > 0 ? 1 : -1;
-    if ('gust' in m && s.phase !== 'ready' && (s.cds[pid] || 0) <= 0) { s.cds[pid] = 2.5; s.gusts.push({ dir: d, t: 0.5 }); }
+    if ('gust' in m && s.phase !== 'ready' && (s.cds[pid] || 0) <= 0) { s.cds[pid] = 2.5 - 0.25 * s.L; s.gusts.push({ dir: d, t: 0.5 }); }
   },
   tick(s, dt) {
     for (const k in s.cds) s.cds[k] -= dt;

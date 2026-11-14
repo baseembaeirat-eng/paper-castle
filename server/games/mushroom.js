@@ -1,10 +1,10 @@
 // 8. Mushroom Trip — everyone clings to the spinning cap; one press to let go.
 const { rnd, r3 } = require('./util');
 const R = 170, D = 330, FLY = 0.8;
-const omega = T => 2.2 + 1.2 * Math.sin(T * 0.9) + T * 0.06;
+const omega = (T, L = 0) => 2.2 + 0.3 * L + 1.2 * Math.sin(T * 0.9) + T * 0.06;
 
 function release(s, p) {
-  const a = s.ang + p.off, om = omega(s.T);
+  const a = s.ang + p.off, om = omega(s.T, s.L);
   const vr = (D - R) / FLY, vt = om * R * 0.35;
   p.x0 = R * Math.cos(a); p.y0 = R * Math.sin(a);
   p.vx = Math.cos(a) * vr - Math.sin(a) * vt;
@@ -17,11 +17,12 @@ module.exports = {
   blurb: 'تشبّث بالفطر الدوّار وأفلِت في اللحظة المناسبة تماماً — وإلّا فاسبح.',
   runnerTip: 'الجميع يركبون معاً. لديك ضغطة واحدة فقط: أفلِت ليقذفك الدوران إلى طوف. ستطير إلى الخارج ومع اتجاه الدوران قليلاً.',
   create(G) {
+    const L = (G.level || 1) - 1; // 0 on the first stage, up to 5
     const n = G.ids.length, a0 = rnd() * Math.PI * 2, a1 = a0 + 1.7 + rnd() * 1.2;
     return {
-      ang: 0, T: 0, time: 20, endT: 0,
+      ang: 0, T: 0, time: 20, endT: 0, L,
       ps: G.ids.map((id, i) => ({ id, off: (Math.PI * 2 * i) / n, st: 'cling', x: 0, y: 0, a: 0 })),
-      plats: [a0, a1].map(a => ({ x: Math.round(D * Math.cos(a)), y: Math.round(D * Math.sin(a)), r: 70 })),
+      plats: (L >= 4 ? [a0] : [a0, a1]).map(a => ({ x: Math.round(D * Math.cos(a)), y: Math.round(D * Math.sin(a)), r: 70 - 6 * L })), // later stages: faster spin, smaller rafts
     };
   },
   input(s, pid, m) {
@@ -30,7 +31,7 @@ module.exports = {
   },
   tick(s, dt, G) {
     s.T += dt; s.time -= dt;
-    s.ang += omega(s.T) * dt;
+    s.ang += omega(s.T, s.L) * dt;
     for (const p of s.ps) {
       if (p.st === 'cling') {
         if (s.time <= 0) release(s, p);

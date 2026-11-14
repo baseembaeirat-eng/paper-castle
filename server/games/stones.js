@@ -18,7 +18,8 @@ module.exports = {
   runnerTip: 'اقفز فوق النهر صفّاً صفّاً. ثلاث غطسات وتخرج — راقب وجوه من تسمّيهم أصدقاءك.',
   othersTip: 'اختر سرّاً أي أحجار في صفوفك تكون ورقاً يغرق (اثنان كحدّ أقصى في الصف). ثم حافظ على وجه جامد.',
   create(G) {
-    const s = { phase: 'setup', t: 25, paper: [], rev: [], owner: [], ready: {}, row: 0, col: 1, lives: 3, jump: null, splash: null, fin: null, time: 60 };
+    const L = (G.level || 1) - 1; // 0 on the first stage, up to 5
+    const s = { phase: 'setup', t: 25, paper: [], rev: [], owner: [], ready: {}, row: 0, col: 1, lives: L >= 4 ? 1 : L >= 2 ? 2 : 3, jump: null, splash: null, fin: null, time: 60 - 6 * L };
     for (let r = 0; r < ROWS; r++) {
       s.paper.push([0, 0, 0]); s.rev.push([0, 0, 0]);
       s.owner.push(G.others.length ? G.others[r % G.others.length] : null);

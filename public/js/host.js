@@ -20,11 +20,12 @@
   const $ = id => document.getElementById(id);
   const stop = fn => e => { e.stopPropagation(); e.currentTarget.blur(); fn(); };
   $('nav-back').addEventListener('click', stop(() => socket.emit(gs && gs.phase === 'result' ? 'back' : 'abort')));
-  $('nav-next').addEventListener('click', stop(() => { if (gs) socket.emit(gs.phase === 'intro' ? 'skip' : gs.phase === 'result' ? 'back' : ''); }));
+  $('nav-next').addEventListener('click', stop(() => { if (gs) socket.emit(gs.phase === 'teams' ? 'begin' : gs.phase === 'intro' ? 'skip' : gs.phase === 'result' ? 'back' : ''); }));
+  $('nav-replay').addEventListener('click', stop(() => socket.emit('replay')));
   $('nav-leave').addEventListener('click', stop(() => { if (confirm('الخروج من هذه الغرفة وفتح غرفة جديدة؟ ستُفقد النقاط.')) { saved.set(null); location.href = '/host'; } }));
   $('nav-mute').addEventListener('click', stop(() => { Sfx.unlock(); $('nav-mute').textContent = Sfx.toggleMute() ? 'تشغيل الصوت' : 'كتم الصوت'; }));
   $('nav-full').addEventListener('click', stop(() => { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.(); }));
-  setInterval(() => { $('nav-back').disabled = !gs; $('nav-next').disabled = !gs || gs.phase === 'play'; }, 250);
+  setInterval(() => { $('nav-back').disabled = !gs; $('nav-next').disabled = !gs || gs.phase === 'play'; $('nav-replay').disabled = !gs || gs.phase !== 'result'; }, 250);
 
   socket.on('connect', connect);
   socket.on('lobby', d => { if (lobby && d.players.length > lobby.players.length) Sfx.play('join'); lobby = d; if (d.phase === 'lobby') gs = null; });
@@ -85,7 +86,7 @@
     }
     if (p.phase === d.phase) return;
     if (d.phase === 'play') Sfx.play('go');
-    else if (d.phase === 'result') Sfx.play(d.over.champion ? 'champion' : (d.kind === 'runner' ? d.over.win : Object.keys(d.awards || {}).length) ? 'win' : 'lose');
+    else if (d.phase === 'result') Sfx.play(d.over.champion || d.final ? 'champion' : (d.kind === 'runner' ? d.over.win : Object.keys(d.awards || {}).length) ? 'win' : 'lose');
   }
   // Mandatory start button: browsers keep audio locked until the first click.
   const startEl = document.getElementById('start');
@@ -95,8 +96,9 @@
   cv.addEventListener('mousemove', e => { mouse = toLogical(e); });
   cv.addEventListener('click', e => {
     const [x, y] = toLogical(e);
-    if (gs) { if (gs.phase === 'intro') socket.emit('skip'); else if (gs.phase === 'result') socket.emit('back'); return; }
     const h = hits.find(r => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h);
+    if (h && h.act) return socket.emit(h.act, h.arg);
+    if (gs) { if (gs.phase === 'intro') socket.emit('skip'); return; }
     if (h) socket.emit('pick', { game: h.id });
   });
   addEventListener('keydown', e => { if (e.key === 'Escape') socket.emit('abort'); if (e.key === 'f') document.documentElement.requestFullscreen?.(); if (e.key === 'm' || e.key === 'M' || e.key === 'ة') Sfx.toggleMute(); });
@@ -123,9 +125,12 @@
       A.stick(c, x + 182, y + 150, 0.95, { ci: p.ci, dir: 'back', t: t + i + 0.6, alpha: p.on ? 1 : 0.4 });
       A.txt(c, p.name + (p.vip ? ' ★' : ''), x + 14, y + 182, 30, { hand: true, bold: true, align: 'left', max: 150 });
       A.txt(c, p.score + ' نقطة', x + 216, y + 184, 22, { align: 'right' });
-      if (lobby.champion === p.id) A.txt(c, 'البطل', x + 115, y + 16, 20, { color: P.brick, bold: true });
+      if (lobby.teamMode) A.txt(c, lobby.teamNames[p.team], x + 115, y + 16, 19, { hand: true, bold: true, color: p.team ? P.slate : P.brick, max: 210 });
+      else if (lobby.champion === p.id) A.txt(c, 'البطل', x + 115, y + 16, 20, { color: P.brick, bold: true });
     }
-    A.txt(c, lobby.players.length ? '★ عريف الحفل يختار اللعبة التالية من جهازه — أو انقر تذكرة هنا.' : 'بانتظار انضمام أول متسابق…', 800, 438, 26, { hand: true });
+    const limit = lobby.target ? `الفوز عند ${lobby.target} نقطة` : 'بدون حد للنقاط';
+    const teamsLine = lobby.teamMode ? `   ·   ${lobby.teamNames[0]} ${lobby.teamTotals[0]} — ${lobby.teamTotals[1]} ${lobby.teamNames[1]}` : '';
+    A.txt(c, lobby.players.length ? `★ عريف الحفل يختار اللعبة والإعدادات من جهازه   ·   ${limit}${teamsLine}` : 'بانتظار انضمام أول متسابق…', 800, 438, 25, { hand: true, max: 1480 });
     // programme of ten games
     hits = [];
     lobby.games.forEach((g, i) => {
@@ -134,6 +139,7 @@
       const tint = [P.sienna, P.slate, P.moss, P.ochre, P.plum, P.teal, P.rose, P.brick, P.sand, P.umber, P.moss, P.plum, P.slate][i % 13];
       A.wash(c, A.rect(x, y, w, h), tint, 40 + i, { alpha: hot ? 0.42 : 0.24, amp: hot ? 6 : 4 }); A.ink(c, A.rect(x, y, w, h), 60 + i, { closed: true, w: hot ? 4 : 2.4 });
       A.txt(c, String(g.num), x + w - 16, y + 24, 24, { align: 'right', bold: true });
+      if (lobby.levels[g.id] > 1) A.txt(c, 'م' + lobby.levels[g.id], x + w - 50, y + 24, 18, { align: 'right', hand: true, color: P.brick });
       A.txt(c, g.tag || (g.kind === 'runner' ? 'واحد ضد الجميع' : 'الكل ضد الكل'), x + 14, y + 24, 19, { align: 'left', hand: true });
       A.txt(c, g.name, x + w / 2, y + 58, 28, { bold: true, max: w - 24 });
       A.wrap(c, g.blurb, x + w / 2, y + 88, 16, w - 24, { hand: true, alpha: 0.85 });
@@ -141,9 +147,31 @@
     });
   }
 
+  // "Choose your side": the screen splits right / left and fills up as phones pick.
+  function drawTeams(t) {
+    const ps = lobby.players.filter(p => p.on), sides = gs.sides;
+    A.txt(c, gs.gname, 800, 92, 76, { bold: true, max: 1300 });
+    A.txt(c, `المرحلة ${gs.level} من ${gs.maxLevel}   ` + '●'.repeat(gs.level) + '○'.repeat(gs.maxLevel - gs.level), 800, 168, 32, { hand: true, color: gs.level > 3 ? P.brick : A.INK });
+    const row = (list, cx, y) => list.forEach((p, i) => { const x = cx + (i - (list.length - 1) / 2) * 150; A.stick(c, x, y, 1.35, { ci: p.ci, emo: 'grit', pose: 'cheer', t: t + i }); A.txt(c, p.name, x, y + 34, 30, { hand: true, bold: true, max: 140 }); });
+    if (sides) {
+      [[820, P.brick, 0], [60, P.slate, 1]].forEach(([x, tint, k]) => {
+        A.wash(c, A.rect(x, 215, 720, 500), tint, 300 + k, { alpha: 0.16, amp: 7 }); A.ink(c, A.rect(x, 215, 720, 500), 302 + k, { closed: true, w: 3 });
+        A.txt(c, sides[k], x + 360, 275, 58, { bold: true, max: 660 });
+        const mine = ps.filter(p => gs.picks[p.id] === k);
+        if (mine.length) row(mine, x + 360, 560); else A.txt(c, 'لا أحد بعد', x + 360, 500, 30, { hand: true, alpha: 0.5 });
+      });
+      A.txt(c, 'ضد', 800, 465, 40, { hand: true, bold: true });
+      const idle = ps.filter(p => !(p.id in gs.picks));
+      idle.forEach((p, i) => { const x = 800 + (i - (idle.length - 1) / 2) * 110; A.stick(c, x, 800, 0.7, { ci: p.ci, emo: 'scared', t: t + i }); A.txt(c, p.name, x, 822, 20, { hand: true }); });
+      if (idle.length) A.txt(c, 'لم يختاروا بعد:', 800 + idle.length * 55 + 90, 780, 24, { hand: true, alpha: 0.7 });
+      if (gs.kind === 'runner') A.txt(c, 'إن اختار أكثر من لاعب الجهة اليمنى نختار واحداً بالقرعة، وإن لم يخترها أحد نختار بالدور.', 800, 742, 22, { hand: true, alpha: 0.75 });
+    } else { A.txt(c, 'الكل ضد الكل', 800, 300, 58, { bold: true }); row(ps, 800, 580); }
+    A.txt(c, `اختاروا من هواتفكم — يبدأ العريف اللعبة، أو تبدأ تلقائياً بعد ${Math.ceil(gs.left)}`, 1540, 866, 26, { hand: true, align: 'right' });
+  }
+
   function drawIntro(t) {
     A.wash(c, A.rect(200, 120, 1200, 660), P.ochre, 71, { alpha: 0.2, amp: 8 }); A.ink(c, A.rect(200, 120, 1200, 660), 72, { closed: true, w: 4 }); A.ink(c, A.rect(216, 136, 1168, 628), 73, { closed: true, w: 1.3, alpha: 0.5 });
-    A.txt(c, `اللعبة رقم ${gs.num}`, 800, 190, 34);
+    A.txt(c, `اللعبة رقم ${gs.num}   ·   المرحلة ${gs.level} من ${gs.maxLevel}`, 800, 190, 34);
     A.txt(c, gs.gname.toUpperCase(), 800, 270, 92, { bold: true, max: 1100 });
     A.wrap(c, gs.blurb, 800, 350, 38, 1000, { hand: true });
     if (gs.runnerId) {
@@ -160,20 +188,22 @@
   }
 
   function drawResult(t) {
-    const champ = gs.over.champion && who(gs.over.champion);
+    const fin = gs.final, winner = fin && fin.id ? who(fin.id) : null;
+    const champ = winner || (gs.over.champion && who(gs.over.champion)), big = champ || fin;
     const ps = lobby.players.slice().sort((a, b) => b.score - a.score);
     // A champion gets the full card; otherwise a low banner so the scene's ending stays visible.
-    const box = champ ? [300, 110, 1000, 700] : [200, 104, 1200, 250];
-    c.fillStyle = champ ? 'rgba(234,223,198,0.7)' : 'rgba(234,223,198,0.25)'; c.fillRect(0, 0, W, H);
+    const box = big ? [300, 110, 1000, 700] : [200, 104, 1200, 250];
+    c.fillStyle = big ? 'rgba(234,223,198,0.7)' : 'rgba(234,223,198,0.25)'; c.fillRect(0, 0, W, H);
     c.fillStyle = 'rgba(243,234,214,0.93)'; c.fillRect(...box);
     A.wash(c, A.rect(...box), P.ochre, 81, { alpha: 0.1, amp: 6 }); A.ink(c, A.rect(...box), 82, { closed: true, w: 4 });
     let y;
-    if (champ) {
-      A.txt(c, 'بطل القلعة', 800, 180, 54, { bold: true, color: P.brick });
-      A.stick(c, 800, 470, 2.2, { ci: champ.ci, emo: 'happy', pose: 'cheer', t });
-      A.txt(c, champ.name, 800, 525, 70, { hand: true, bold: true });
+    if (big) {
+      A.txt(c, fin ? `الفائز بالبطولة — بلغ ${fin.score} نقطة` : 'بطل القلعة', 800, 180, 50, { bold: true, color: P.brick });
+      if (champ) A.stick(c, 800, 470, 2.2, { ci: champ.ci, emo: 'happy', pose: 'cheer', t });
+      else lobby.players.filter(p => p.team === fin.team).forEach((p, i, a) => A.stick(c, 800 + (i - (a.length - 1) / 2) * 130, 460, 1.6, { ci: p.ci, emo: 'happy', pose: 'cheer', t: t + i }));
+      A.txt(c, champ ? champ.name : fin.name, 800, 525, 70, { hand: true, bold: true });
       A.wrap(c, gs.over.text, 800, 590, 30, 900, { hand: true });
-      y = 740;
+      y = 720;
     } else { A.wrap(c, gs.over.text, 800, 156, 44, 1100, { hand: true, bold: true }); y = 312; }
     ps.forEach((p, i) => {
       const x = 800 + (i - (ps.length - 1) / 2) * 180, got = gs.awards[p.id];
@@ -181,7 +211,16 @@
       A.txt(c, p.name, x - 34, y - 14, 28, { hand: true, bold: true, align: 'left', max: 130 });
       A.txt(c, p.score + ' نقطة' + (got ? ` \u2066(+${got})\u2069` : ''), x - 34, y + 14, 19, { align: 'left', color: got ? P.moss : A.INK });
     });
-    A.txt(c, 'انقر للعودة إلى الردهة', box[0] + box[2] - 20, box[1] + 22, 20, { hand: true, alpha: 0.6, align: 'right' });
+    if (lobby.teamMode) A.txt(c, `${lobby.teamNames[0]} ${lobby.teamTotals[0]} — ${lobby.teamTotals[1]} ${lobby.teamNames[1]}`, box[0] + 20, box[1] + 24, 21, { hand: true, bold: true, align: 'left' });
+    // the two choices after every game
+    hits = [{ x: 810, y: box[1] + box[3] + 14, w: 330, h: 64, act: 'replay', label: 'إعادة اللعبة ↻' }, { x: 460, y: box[1] + box[3] + 14, w: 330, h: 64, act: 'back', label: 'الصفحة الرئيسية' }];
+    if (big) hits.forEach(b => { b.y = box[1] + box[3] - 78; });
+    hits.forEach((b, i) => {
+      const hot = mouse[0] >= b.x && mouse[0] <= b.x + b.w && mouse[1] >= b.y && mouse[1] <= b.y + b.h;
+      c.fillStyle = 'rgba(243,234,214,0.95)'; c.fillRect(b.x, b.y, b.w, b.h);
+      A.wash(c, A.rect(b.x, b.y, b.w, b.h), i ? P.slate : P.moss, 85 + i, { alpha: hot ? 0.5 : 0.3, amp: 3 }); A.ink(c, A.rect(b.x, b.y, b.w, b.h), 87 + i, { closed: true, w: hot ? 4 : 2.6 });
+      A.txt(c, b.label, b.x + b.w / 2, b.y + b.h / 2, 30, { bold: true });
+    });
   }
 
   function frame() {
@@ -190,7 +229,9 @@
     Sfx.ambient(gs && gs.phase === 'play' ? AMBIENT[gs.gid] : null);
     Sfx.music(!lobby ? null : !gs ? 'lobby' : gs.phase === 'result' ? null : 'game');
     if (!lobby) A.txt(c, 'نفتح أبواب القلعة…', 800, 450, 48, { hand: true });
-    else if (!gs) drawLobby(t);
+    if (gs && gs.phase !== 'result') hits = [];
+    if (!lobby) {} else if (!gs) drawLobby(t);
+    else if (gs.phase === 'teams') drawTeams(t);
     else if (gs.phase === 'intro') drawIntro(t);
     else {
       const sc = Scenes[gs.gid];
@@ -201,7 +242,7 @@
       }
       c.drawImage(bg.cv, 0, 0);
       sc.draw(c, gs.v, S);
-      A.txt(c, `${gs.num}.  ${gs.gname}`, 40, 46, 34, { align: 'left', bold: true });
+      A.txt(c, `${gs.num}.  ${gs.gname}  ·  المرحلة ${gs.level}`, 40, 46, 34, { align: 'left', bold: true });
       if (gs.runnerId) A.txt(c, (gs.gid === 'skittles' ? 'صاحب الكرة: ' : 'العدّاء: ') + who(gs.runnerId).name, 42, 86, 30, { align: 'left', hand: true, bold: true });
       if (gs.v.time !== undefined && gs.phase === 'play') { A.ink(c, A.circ(1510, 56, 44, 14, 34), 90, { closed: true, w: 3 }); A.txt(c, mmss(gs.v.time), 1510, 58, 34, { bold: true, color: gs.v.time < 10 ? P.brick : A.INK }); }
       if (gs.phase === 'result') drawResult(t);

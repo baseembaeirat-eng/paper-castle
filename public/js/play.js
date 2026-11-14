@@ -37,14 +37,21 @@
     app.replaceChildren(h('h1', {}, 'قلعة الورق'), text('بطولة كبرى من السقطات والغطسات والأبواب'),
       h('div', { class: 'fill' }, code, name, tap('خذ مكانك', 'green', go), msg));
   }
+  // A permanent id for this phone, so the server can hand back the same seat and score
+  // after the browser is closed, even if the room token was lost.
+  function deviceId() {
+    let id = store.get('pc_device');
+    if (!id) { id = 'd' + Math.random().toString(36).slice(2) + Date.now().toString(36); store.set('pc_device', id); }
+    return id;
+  }
   function join(code, name, silent, onErr) {
     code = String(code || '').trim().toUpperCase();
-    socket.emit('join', { code, name, token: store.get('pc_token_' + code) }, res => {
+    socket.emit('join', { code, name, token: store.get('pc_token_' + code), device: deviceId() }, res => {
       if (res.error) { if (silent) showJoin(''); else onErr(res.error); return; }
-      joined = true; store.set('pc_code', res.code); store.set('pc_name', name || store.get('pc_name') || ''); store.set('pc_token_' + res.code, res.token);
+      joined = true; store.set('pc_code', res.code); store.set('pc_name', res.name || name || store.get('pc_name') || ''); store.set('pc_token_' + res.code, res.token);
     });
   }
-  socket.on('connect', () => { const code = store.get('pc_code'); if (code && store.get('pc_token_' + code)) join(code, store.get('pc_name'), true); else showJoin(''); });
+  socket.on('connect', () => { const code = store.get('pc_code'); if (code) join(code, store.get('pc_name'), true); else showJoin(''); }); // come straight back to the last room
   socket.on('disconnect', () => { if (cleanup) { cleanup(); cleanup = null; } sig = ''; app.replaceChildren(waitScreen('انقطع الاتصال بالقلعة…', 'نعيد الاتصال.')); });
 
   // ---- sound and vibration on the phone ----------------------------------------------
@@ -64,6 +71,7 @@
     const a = p.v, b = d.v;
     if (d.phase !== 'play' || !a || !b) return;
     const hurt = () => { Sfx.play('hit'); Sfx.buzz(140); };
+    if (b.hunter && b.near <= 1 && a.near > 1) { Sfx.play('correct'); Sfx.buzz(60); } // the hunter is right next to the Runner
     if (b.growl !== undefined && b.growl <= 1 && a.growl > 1) { Sfx.play('growl'); Sfx.buzz([90, 50, 90]); } // a monster next door
     if (b.lives < a.lives || b.hp < a.hp) hurt();
     if (b.won && !a.won) Sfx.play('correct');
@@ -77,7 +85,7 @@
     if (!joined) return;
     feel(cur, d);
     cur = d;
-    const s = [d.phase, d.gid, d.role, d.seq, d.vip, d.v && d.v.ui].join('|');
+    const s = [d.phase, d.gid, d.role, d.seq, d.vip, d.v && d.v.ui, d.teamMode, !!d.sides].join('|');
     if (s !== sig) {
       sig = s;
       if (cleanup) { cleanup(); cleanup = null; }
@@ -93,24 +101,29 @@
     if (!confirm('هل تريد الخروج من الغرفة؟')) return;
     socket.emit('leave');
     const code = store.get('pc_code');
-    try { localStorage.removeItem('pc_token_' + code); } catch (e) {}
+    try { localStorage.removeItem('pc_token_' + code); localStorage.removeItem('pc_code'); } catch (e) {}
     if (cleanup) { cleanup(); cleanup = null; }
     cur = null; showJoin('');
   }
   function nav(d) {
     const b = (label, fn) => h('button', { type: 'button', onclick: fn }, label);
-    const inGame = d.phase === 'intro' || d.phase === 'play' || d.phase === 'result';
+    const inGame = d.phase === 'teams' || d.phase === 'intro' || d.phase === 'play' || d.phase === 'result';
     return h('div', { class: 'nav' },
       b('خروج من الغرفة', leave),
       d.vip && inGame ? b('→ رجوع للردهة', () => socket.emit(d.phase === 'result' ? 'back' : 'abort')) : null,
-      d.vip && d.phase === 'intro' ? b('التالي ←', () => socket.emit('skip')) : null);
+      d.vip && (d.phase === 'intro' || d.phase === 'teams') ? b('التالي ←', () => socket.emit(d.phase === 'teams' ? 'begin' : 'skip')) : null);
   }
 
   function mount(d) {
     if (d.phase === 'lobby') return lobbyView(d);
+    if (d.phase === 'teams') return teamsView(d);
     if (d.phase === 'wait') return { el: waitScreen('اللعبة جارية الآن.', 'ستشارك في اللعبة التالية.') };
     if (d.phase === 'intro') return { el: h('div', { class: 'fill' }, h('h1', {}, d.gname), text(d.role === 'runner' ? (d.gid === 'skittles' ? 'أنت صاحب الكرة' : 'أنت العدّاء') : d.role === 'other' ? 'أنت ضد العدّاء' : 'الجميع يلعبون'), h('div', { class: 'note' }, text(d.tip)), d.vip ? tap('ابدأ الآن', 'green', () => socket.emit('skip')) : null) };
-    if (d.phase === 'result') return { el: h('div', { class: 'fill' }, d.champion ? h('h1', {}, 'بطل القلعة!') : null, text(d.text), text(d.got ? `ربحت ${d.got} نقطة` : 'لا نقاط هذه المرة', 'small'), d.vip ? tap('العودة إلى الردهة', 'green', () => socket.emit('back')) : null) };
+    if (d.phase === 'result') return { el: h('div', { class: 'fill' },
+      d.final ? h('h1', {}, `الفائز بالبطولة: ${d.final.name}`) : d.champion ? h('h1', {}, 'بطل القلعة!') : null,
+      text(d.text), text(d.got ? `ربحت ${d.got} نقطة` : 'لا نقاط هذه المرة', 'small'),
+      d.vip ? tap('إعادة اللعبة ↻ (المرحلة التالية)', 'green', () => socket.emit('replay')) : null,
+      d.vip ? tap('الصفحة الرئيسية', 'blue', () => socket.emit('back')) : text('بانتظار عريف الحفل: إعادة اللعبة أم الصفحة الرئيسية؟', 'small')) };
     return UI[d.gid](d);
   }
 
@@ -127,8 +140,48 @@
     };
     draw(); cleanup = () => cancelAnimationFrame(raf);
     const info = text('');
+    const click = (label, cls, fn) => h('button', { type: 'button', class: cls, onclick: fn }, label);
+    // team mode: everyone chooses a team here; the Master of Ceremonies can rename both
+    const teamBtns = d.teamMode ? [0, 1].map(k => click('', k ? 'blue' : 'red', () => socket.emit('team', { team: k }))) : [];
+    const teamRow = d.teamMode ? [text('اختر فريقك:', 'small'), h('div', { class: 'row' }, teamBtns)] : [];
+    let settings = [], target, mode, names = [];
+    if (d.vip) {
+      target = click('', '', () => { const i = cur.targets.indexOf(cur.target); socket.emit('set', { target: cur.targets[(i + 1) % cur.targets.length] }); });
+      mode = click('', '', () => socket.emit('set', { teamMode: !cur.teamMode }));
+      names = d.teamMode ? [0, 1].map(k => h('input', { maxlength: 14, value: d.teamNames[k], placeholder: 'اسم الفريق' })) : [];
+      const save = () => socket.emit('set', { teamNames: names.map(n => n.value) });
+      names.forEach(n => { n.style.fontSize = '18px'; n.style.padding = '8px'; n.addEventListener('change', save); });
+      settings = [h('div', { class: 'note settings' }, text('إعدادات السهرة', 'small'), h('div', { class: 'row' }, target, mode),
+        d.teamMode ? h('div', { class: 'row' }, names) : null, d.teamMode ? click('حفظ أسماء الفرق', 'green', save) : null,
+        click('تصفير النقاط والمراحل', '', () => { if (confirm('تصفير نقاط الجميع والعودة إلى المرحلة الأولى؟')) socket.emit('set', { reset: true }); }))];
+    }
     const menu = d.vip ? h('div', { class: 'grid menu' }, d.games.map(g => h('button', { class: g.kind === 'runner' ? '' : 'blue', onclick: () => socket.emit('pick', { game: g.id }) }, `${g.num}. ${g.name}`))) : null;
-    return { el: [cv, info, d.vip ? text('أنت عريف الحفل — اختر اللعبة التالية:', 'small') : waitScreen('بانتظار أن يختار عريف الحفل لعبة.'), menu].filter(Boolean), update: x => { info.textContent = `الغرفة ${x.code} · عدد المتسابقين: ${x.n}${x.champion ? ' · أنت البطل الحالي!' : ''}`; } };
+    return {
+      el: [cv, info, ...teamRow, ...settings, d.vip ? text('اختر اللعبة التالية:', 'small') : waitScreen('بانتظار أن يختار عريف الحفل لعبة.'), menu].filter(Boolean),
+      update: x => {
+        info.textContent = `الغرفة ${x.code} · عدد المتسابقين: ${x.n}` + (x.target ? ` · الفوز عند ${x.target} نقطة` : '') + (x.champion ? ' · أنت البطل الحالي!' : '');
+        teamBtns.forEach((b, k) => { b.textContent = `${x.teamNames[k]} (${x.teamTotals[k]})`; b.classList.toggle('on', x.me.team === k); b.style.opacity = x.me.team === k ? 1 : 0.55; });
+        if (target) target.textContent = x.target ? `حد النقاط: ${x.target}` : 'حد النقاط: بدون';
+        if (mode) mode.textContent = x.teamMode ? 'وضع الفرق: مفعّل' : 'وضع الفرق: متوقف';
+        names.forEach((n, k) => { if (document.activeElement !== n) n.value = x.teamNames[k]; });
+      },
+    };
+  }
+
+  // Before every game: pick a side (runner / attackers, or a team) and, for the host, the stage.
+  function teamsView(d) {
+    const click = (label, cls, fn) => h('button', { type: 'button', class: cls, onclick: fn }, label);
+    const info = text(''), stage = text('');
+    const btns = d.sides ? d.sides.map((_, k) => tap('', 'big ' + (k ? 'blue' : 'red'), () => socket.emit('side', { side: k }))) : [];
+    const host = d.vip ? [h('div', { class: 'row levels' }, click('مرحلة أسهل −', '', () => socket.emit('level', { d: -1 })), click('مرحلة أصعب +', '', () => socket.emit('level', { d: 1 }))), click('ابدأ اللعبة ▶', 'green', () => socket.emit('begin'))] : [text('بانتظار عريف الحفل ليبدأ اللعبة.', 'small')];
+    return {
+      el: [h('h1', {}, d.gname), stage, info, d.sides ? h('div', { class: 'col' }, btns) : h('div', { class: 'fill' }, text('الكل ضد الكل')), ...host],
+      update: x => {
+        stage.textContent = `المرحلة ${x.level} من ${x.maxLevel} — كل مرحلة فيها عقبات أكثر`;
+        info.textContent = !x.sides ? '' : x.pick < 0 ? 'اختر جهتك:' : `اخترت: ${x.sides[x.pick]}`;
+        btns.forEach((b, k) => { b.textContent = `${x.sides[k]} (${x.counts[k]})`; b.classList.toggle('on', x.pick === k); b.style.opacity = x.pick < 0 || x.pick === k ? 1 : 0.5; });
+      },
+    };
   }
 
   // ---- per-game controls -------------------------------------------------------------
@@ -174,15 +227,9 @@
           if (v.ui === 'r') {
             center = [260, 260]; hex(center, 200, v.d, 3, A.PAL.sand);
             v.d.forEach((open, k) => { if (!open) return; const a = (-k * Math.PI) / 3; A.txt(c, '➤', 260 + Math.cos(a) * 205, 260 + Math.sin(a) * 205, 44, { rot: a, color: A.PAL.brick }); });
+            if (v.hunter) { A.stick(c, 260, 310, 1.3, { ci: x.me.ci, emo: 'angry', horns: true, t: performance.now() / 1000 }); msg.textContent = 'اضغط سهماً أحمر لتعبر. ' + (v.near <= 0 ? 'أمسكته!' : v.near <= 1 ? 'العدّاء في غرفة مجاورة تماماً!' : v.near <= 2 ? 'تسمع خطواته قريبة جداً…' : v.near <= 3 ? 'خطوات خافتة في مكان ما…' : 'لا أثر له هنا. ابحث أبعد.'); return; }
             A.stick(c, 260, 310, 1.3, { ci: x.me.ci, emo: v.growl <= 1 ? 'shock' : v.growl <= 2 ? 'scared' : 'grit', t: performance.now() / 1000 });
             msg.textContent = 'اضغط على أحد الأسهم الحمراء لتعبر من الباب. ' + (v.growl <= 1 ? 'شيء ما يتنفس في الغرفة المجاورة تماماً!' : v.growl <= 2 ? 'تسمع مخالب على الحجر، قريباً منك…' : 'هدوء. حتى الآن.') + (v.far <= 2 ? ' فانوس يتوهّج جهة اليمين.' : '');
-          } else {
-            const s = 36, pos = (q, r) => [260 + s * Math.sqrt(3) * (q + r / 2), 260 + s * 1.5 * r];
-            v.cells.forEach((cell, n) => hex(pos(cell.q, cell.r), s, cell.d, n * 20 + 1, cell.q === v.exit.q && cell.r === v.exit.r ? A.PAL.ochre : A.PAL.stone));
-            v.mons.forEach(m => { const p = pos(m.q, m.r), me = m.q === v.me.q && m.r === v.me.r; A.wash(c, A.circ(p[0], p[1], me ? 15 : 10), me ? A.PCOL[x.me.ci] : A.PAL.soot, 5, { alpha: 0.6, amp: 1 }); if (me) A.ink(c, A.circ(p[0], p[1], 17), 6, { closed: true, w: 3 }); });
-            const rp = pos(v.runner.q, v.runner.r); A.txt(c, '✗', rp[0], rp[1], 40, { color: A.PAL.brick, bold: true });
-            center = pos(v.me.q, v.me.r);
-            msg.textContent = 'أنت النقطة المحاطة بدائرة. اضغط باتجاه فتحة باب لتتحرك. علامة ✗ هي العدّاء.';
           }
         },
       };
@@ -285,9 +332,9 @@
     },
 
     tug(d) {
-      const side = d.v.team ? 'الأيمن' : 'الأيسر';
-      if (d.v.ui === 'ready') return { el: waitScreen(`أنت في الفريق ${side}`, 'استعد… وحين تظهر الإشارة اضغط بأسرع ما تستطيع!') };
-      return { el: [text(`الفريق ${side} — اضغط بأسرع ما تستطيع!`, 'small'), h('div', { class: 'col' }, tap('اسحب!', 'big red', () => send({ tap: 1 })))] };
+      const side = d.v.team;
+      if (d.v.ui === 'ready') return { el: waitScreen(`أنت في ${side}`, 'استعد… وحين تظهر الإشارة اضغط بأسرع ما تستطيع!') };
+      return { el: [text(`${side} — اضغط بأسرع ما تستطيع!`, 'small'), h('div', { class: 'col' }, tap('اسحب!', 'big red', () => send({ tap: 1 })))] };
     },
 
     sumo(d) {

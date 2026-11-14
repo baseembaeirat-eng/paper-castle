@@ -39,10 +39,11 @@ function chase(s, m) { // breadth-first step toward the runner
 
 module.exports = {
   id: 'honeycomb', name: 'متاهة الوحش السداسية', kind: 'runner',
-  blurb: 'عدّاء واحد تائه بين الخلايا، والوحوش تعرف كل جدار.',
+  blurb: 'عدّاء واحد تائه بين الخلايا، ووحوش تطارده على صوت خطواته.',
   runnerTip: 'أنت ترى فقط الغرفة التي تقف فيها. اضغط على فتحة باب لتعبر منها، وابحث عن باب الفانوس في أقصى اليمين.',
-  othersTip: 'أنت وحش وترى المتاهة كلها — اضغط باتجاه فتحة باب لتتحرك، وحاصِر العدّاء.',
+  othersTip: 'أنت وحش. ترى فقط الغرفة التي أنت فيها — اضغط سهماً لتعبر، واتبع صوت خطوات العدّاء حتى تمسكه.',
   create(G) {
+    const L = (G.level || 1) - 1; // 0 on the first stage, up to 5
     const cells = {};
     for (let q = -R; q <= R; q++) for (let r = -R; r <= R; r++)
       if (Math.abs(q + r) <= R) cells[key(q, r)] = { q, r, d: [0, 0, 0, 0, 0, 0] };
@@ -55,10 +56,10 @@ module.exports = {
       const n = open(c, pick(opts)); seen.add(key(n.q, n.r)); stack.push(n);
     }
     for (const c of Object.values(cells)) for (let d = 0; d < 3; d++)
-      if (!c.d[d] && cells[key(c.q + DIRS[d][0], c.r + DIRS[d][1])] && rnd() < 0.4) open(c, d);
+      if (!c.d[d] && cells[key(c.q + DIRS[d][0], c.r + DIRS[d][1])] && rnd() < 0.42 - 0.07 * L) open(c, d); // later stages: fewer doors
     const mons = G.others.map((id, i) => ({ id, q: STARTS[i][0], r: STARTS[i][1], cd: 0 }));
-    for (let i = mons.length; i < 2; i++) mons.push({ id: 'bot' + i, bot: true, q: STARTS[i][0], r: STARTS[i][1], cd: 6 }); // guard bots give the Runner a head start
-    return { cells, mons, runner: { q: -3, r: 0, cd: 0 }, exit: { q: 3, r: 0 }, time: 90 };
+    for (let i = mons.length; i < Math.min(5, 2 + Math.floor(L / 2)); i++) mons.push({ id: 'bot' + i, bot: true, q: STARTS[i][0], r: STARTS[i][1], cd: 6 }); // guard bots give the Runner a head start
+    return { cells, mons, runner: { q: -3, r: 0, cd: 0 }, exit: { q: 3, r: 0 }, time: 90 - 8 * L, botCd: 1.5 - 0.12 * L };
   },
   input(s, pid, m, G) {
     const d = m.d | 0;
@@ -76,14 +77,14 @@ module.exports = {
         const c = s.cells[key(m.q, m.r)];
         let d = rnd() < 0.65 ? chase(s, m) : -1;
         if (d < 0) d = pick([0, 1, 2, 3, 4, 5].filter(x => c.d[x]));
-        step(s, m, d); m.cd = 1.5;
+        step(s, m, d); m.cd = s.botCd;
       }
     }
     check(s);
     if (!s.over && s.time <= 0) s.over = { win: false, text: 'انطفأت الفوانيس، وبقي العدّاء حبيس المتاهة.' };
   },
   view(s) {
-    return { cells: Object.values(s.cells), runner: { q: s.runner.q, r: s.runner.r }, mons: s.mons.map(m => ({ id: m.id, q: m.q, r: m.r })), exit: s.exit, time: s.time };
+    return { cells: Object.values(s.cells), seen: !!s.over || s.mons.some(m => dist(m, s.runner) <= 1), runner: { q: s.runner.q, r: s.runner.r }, mons: s.mons.map(m => ({ id: m.id, q: m.q, r: m.r })), exit: s.exit, time: s.time };
   },
   pview(s, pid, G) {
     if (pid === G.runnerId) {
@@ -91,6 +92,7 @@ module.exports = {
       return { ui: 'r', d: c.d, growl: Math.min(...s.mons.map(m => dist(m, s.runner))), far: dist(s.exit, s.runner) };
     }
     const me = s.mons.find(m => m.id === pid);
-    return { ui: 'm', cells: Object.values(s.cells), me: { q: me.q, r: me.r }, runner: { q: s.runner.q, r: s.runner.r }, mons: s.mons.map(m => ({ id: m.id, q: m.q, r: m.r })), exit: s.exit };
+    // Hunters get the same one-room view as the Runner, plus how close the Runner sounds.
+    return { ui: 'r', hunter: true, d: s.cells[key(me.q, me.r)].d, near: dist(me, s.runner) };
   },
 };

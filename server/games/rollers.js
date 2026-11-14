@@ -1,7 +1,7 @@
 // 6. High Rollers — hop across spinning drums whose speed the others keep changing.
 const { rnd, clamp, r3 } = require('./util');
 const N = 5;
-const spin = () => (rnd() < 0.5 ? -1 : 1) * (0.8 + rnd() * 1.8);
+const spin = (k = 1) => (rnd() < 0.5 ? -1 : 1) * (0.8 + rnd() * 1.8) * k;
 
 module.exports = {
   id: 'rollers', name: 'القفز على الأسطوانات', kind: 'runner',
@@ -9,7 +9,9 @@ module.exports = {
   runnerTip: 'امشِ عكس الدوران بالأسهم لتبقى في الأعلى، ثبّت قدميك، ثم «اقفز» إلى البرميل التالي.',
   othersTip: 'اضغط على برميل لتغيّر سرعته واتجاهه. افعلها لحظة هبوط العدّاء.',
   create(G) {
-    return { om: Array.from({ length: N }, spin), rot: Array(N).fill(0), on: -1, x: 0, mv: 0, foot: 0, air: null, cds: {}, bot: G.others.length ? 0 : 2, time: 60 };
+    const L = (G.level || 1) - 1; // 0 on the first stage, up to 5
+    const k = 1 + 0.12 * L; // later stages: faster drums
+    return { om: Array.from({ length: N }, () => spin(k)), k, L, rot: Array(N).fill(0), on: -1, x: 0, mv: 0, foot: 0, air: null, cds: {}, bot: G.others.length && L < 2 ? 0 : 2, time: 60 };
   },
   input(s, pid, m, G) {
     if (pid === G.runnerId) {
@@ -18,12 +20,12 @@ module.exports = {
       return;
     }
     const i = m.cyl | 0;
-    if ('cyl' in m && i >= 0 && i < N && (s.cds[pid] || 0) <= 0) { s.cds[pid] = 1.2; s.om[i] = spin(); }
+    if ('cyl' in m && i >= 0 && i < N && (s.cds[pid] || 0) <= 0) { s.cds[pid] = 1.2 - 0.1 * s.L; s.om[i] = spin(s.k); }
   },
   tick(s, dt) {
     s.time -= dt;
     for (const k in s.cds) s.cds[k] -= dt;
-    if (s.bot && (s.bot -= dt) <= 0) { s.bot = 1 + rnd() * 2; s.om[Math.floor(rnd() * N)] = spin(); }
+    if (s.bot && (s.bot -= dt) <= 0) { s.bot = 1 + rnd() * 2; s.om[Math.floor(rnd() * N)] = spin(s.k); }
     for (let i = 0; i < N; i++) s.rot[i] += s.om[i] * dt;
     if (s.air) {
       s.air.t += dt / 0.55;

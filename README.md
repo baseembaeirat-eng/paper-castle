@@ -73,6 +73,23 @@ Each file in `server/games/` exports:
 The client side is a matching entry in `Scenes` (scenes.js) and `UI` (play.js).
 Phones only ever send intent (`socket.emit('in', …)`); all outcomes are decided on the server.
 
+## A round, step by step
+
+1. **Lobby.** The Master of Ceremonies (first player in, ★) sets an optional score limit
+   (10/20/30/50), turns team mode on or off and names the two teams, then picks a game.
+2. **Choose your side.** The main screen splits right/left. In 1-vs-all games players pick
+   runner or attackers (several volunteers draw lots; no volunteer falls back to rotation).
+   In Tug of War they pick a team. The host can raise or lower the stage here.
+3. **Title card, play, result.** After the result the host chooses *replay* (same game, next
+   stage) or *home*.
+
+Every game has six stages (`G.level`, 1–6); each module reads it in `create()` to add
+obstacles: fewer doors and more guards, faster boulders, barrels in the arena, and so on.
+A game's stage goes up by one each time it is finished.
+
+Seats survive a closed browser: the phone keeps a device id and room token, and a seat left
+empty can also be reclaimed by joining with the same name. Empty seats are kept for 30 minutes.
+
 ## Scoring
 
 Runner games: the Runner earns 3 for succeeding, otherwise every opponent earns 1.

@@ -4,14 +4,14 @@ const ROUNDS = 5;
 const SYMS = ['☀', '☾', '★', '♣', '♥', '♦', '♠', '✿'];
 const ri = (a, b) => a + Math.floor(rnd() * (b - a + 1));
 
-function puzzle() {
+function puzzle(L) {
   if (rnd() < 0.4) {
     const [A, B, C] = shuffle(SYMS);
     const [seq, ans] = pick([[[A, B, A, B, A], B], [[A, B, C, A, B], C], [[A, A, B, A, A], B], [[A, B, B, A, B], B], [[A, B, C, C, B], A]]);
     const cards = shuffle([ans, ...shuffle(SYMS.filter(x => x !== ans)).slice(0, 5)]);
     return { text: seq.join('  ') + '  ?', sub: 'ما التالي؟ (اقرأ من اليسار إلى اليمين)', cards, answer: cards.indexOf(ans) };
   }
-  const a = ri(3, 12), b = ri(2, 9), c = ri(1, 15);
+  const a = ri(3, 12 + 3 * L), b = ri(2, 9), c = ri(1, 15 + 6 * L); // later stages: bigger numbers, less time
   const [text, ans] = pick([[`${a} × ${b} + ${c}`, a * b + c], [`${a * b} ÷ ${b} + ${c}`, a + c], [`${a} × ${b} − ${c}`, a * b - c], [`${a + c} + ${b} × ${b}`, a + c + b * b]]);
   const set = new Set([ans]);
   for (const d of shuffle([1, -1, 2, -2, 10, -10, b, -b, 3])) { if (set.size >= 6) break; set.add(ans + d); }
@@ -19,7 +19,8 @@ function puzzle() {
   return { text: text + ' = ?', sub: 'ارتمِ على البطاقة الصحيحة!', cards, answer: cards.indexOf(String(ans)) };
 }
 function next(s, G) {
-  s.round++; s.phase = 'ask'; s.t = 20; s.q = puzzle(); s.picks = {}; s.winner = null;
+  const L = (G.level || 1) - 1;
+  s.round++; s.phase = 'ask'; s.t = 20 - 2 * L; s.q = puzzle(L); s.picks = {}; s.winner = null;
   s.perm = Object.fromEntries(G.ids.map(id => [id, shuffle([0, 1, 2, 3, 4, 5])]));
 }
 
