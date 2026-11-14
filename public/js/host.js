@@ -127,7 +127,6 @@
     }
     A.txt(c, lobby.players.length ? '★ عريف الحفل يختار اللعبة التالية من جهازه — أو انقر تذكرة هنا.' : 'بانتظار انضمام أول متسابق…', 800, 438, 26, { hand: true });
     // programme of ten games
-    A.txt(c, Sfx.muted() ? 'الصوت مكتوم — اضغط M لتشغيله' : 'اضغط M لكتم الصوت', 330, 884, 20, { hand: true, alpha: 0.6 });
     hits = [];
     lobby.games.forEach((g, i) => {
       const x = 60 + (4 - (i % 5)) * 300, y = 462 + Math.floor(i / 5) * 138, w = 280, h = 126; // first ticket on the right
