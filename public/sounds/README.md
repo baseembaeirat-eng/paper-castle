@@ -35,6 +35,8 @@ Drop an MP3 with one of these exact names into this folder and reload the page t
 | `win.mp3` | win |
 | `lose.mp3` | lose |
 | `champion.mp3` | champion |
+| `strike.mp3` | strike |
+| `cheer.mp3` | cheer |
 | `bgm-lobby.mp3` | bgm-lobby |
 | `bgm-game.mp3` | bgm-game |
 

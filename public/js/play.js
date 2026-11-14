@@ -68,7 +68,7 @@
     if (b.lives < a.lives || b.hp < a.hp) hurt();
     if (b.won && !a.won) Sfx.play('correct');
     if (b.pick >= 0 && a.pick < 0 && !b.won) { Sfx.play('wrong'); Sfx.buzz(120); }
-    if (b.ui !== a.ui && (b.ui === 'splash' || b.ui === 'd')) hurt();
+    if (b.ui !== a.ui && (b.ui === 'splash' || b.ui === 'd' || b.ui === 'down')) hurt();
     if (b.ui !== a.ui && b.ui === 'safe') Sfx.play('win');
   }
 
@@ -91,7 +91,7 @@
   function mount(d) {
     if (d.phase === 'lobby') return lobbyView(d);
     if (d.phase === 'wait') return { el: waitScreen('اللعبة جارية الآن.', 'ستشارك في اللعبة التالية.') };
-    if (d.phase === 'intro') return { el: h('div', { class: 'fill' }, h('h1', {}, d.gname), text(d.role === 'runner' ? 'أنت العدّاء' : d.role === 'other' ? 'أنت ضد العدّاء' : 'الجميع يلعبون'), h('div', { class: 'note' }, text(d.tip)), d.vip ? tap('ابدأ الآن', 'green', () => socket.emit('skip')) : null) };
+    if (d.phase === 'intro') return { el: h('div', { class: 'fill' }, h('h1', {}, d.gname), text(d.role === 'runner' ? (d.gid === 'skittles' ? 'أنت صاحب الكرة' : 'أنت العدّاء') : d.role === 'other' ? 'أنت ضد العدّاء' : 'الجميع يلعبون'), h('div', { class: 'note' }, text(d.tip)), d.vip ? tap('ابدأ الآن', 'green', () => socket.emit('skip')) : null) };
     if (d.phase === 'result') return { el: h('div', { class: 'fill' }, d.champion ? h('h1', {}, 'بطل القلعة!') : null, text(d.text), text(d.got ? `ربحت ${d.got} نقطة` : 'لا نقاط هذه المرة', 'small'), d.vip ? tap('العودة إلى الردهة', 'green', () => socket.emit('back')) : null) };
     return UI[d.gid](d);
   }
@@ -109,13 +109,33 @@
     };
     draw(); cleanup = () => cancelAnimationFrame(raf);
     const info = text('');
-    const menu = d.vip ? h('div', { class: 'grid menu' }, d.games.map(g => tap(`${g.num}. ${g.name}`, g.kind === 'runner' ? '' : 'blue', () => socket.emit('pick', { game: g.id })))) : null;
+    const menu = d.vip ? h('div', { class: 'grid menu' }, d.games.map(g => h('button', { class: g.kind === 'runner' ? '' : 'blue', onclick: () => socket.emit('pick', { game: g.id }) }, `${g.num}. ${g.name}`))) : null;
     return { el: [cv, info, d.vip ? text('أنت عريف الحفل — اختر اللعبة التالية:', 'small') : waitScreen('بانتظار أن يختار عريف الحفل لعبة.'), menu].filter(Boolean), update: x => { info.textContent = `الغرفة ${x.code} · عدد المتسابقين: ${x.n}${x.champion ? ' · أنت البطل الحالي!' : ''}`; } };
   }
 
   // ---- per-game controls -------------------------------------------------------------
   const cooldown = (label, cls, msg) => { const b = tap(label, 'big ' + cls, () => send(msg)); return { el: h('div', { class: 'col' }, b), update: d => { b.disabled = !d.v.rdy; } }; };
   const DIRS = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+  // Tilt control with a drag-bar fallback; sends { tilt: -1..1 } twenty times a second.
+  function tiltPad(hint) {
+    let tilt = 0, touch = false, gyro = false;
+    const pad = h('div', { class: 'pad' }, h('span', {}, hint), h('i')), knob = pad.lastChild;
+    const onOri = e => { if (e.gamma == null) return; gyro = true; if (!touch) tilt = clamp(e.gamma / 30, -1, 1); };
+    const enable = tap('فعّل التحكم بالميلان', 'green', b => {
+      const D = window.DeviceOrientationEvent;
+      if (D && D.requestPermission) D.requestPermission().then(r => { if (r === 'granted') addEventListener('deviceorientation', onOri); b.textContent = r === 'granted' ? 'تم تفعيل الميلان' : 'رُفض الميلان — اسحب في الأسفل'; }).catch(() => { b.textContent = 'الميلان غير متاح — اسحب في الأسفل'; });
+      else { addEventListener('deviceorientation', onOri); b.textContent = 'الميلان مفعّل (إن كان جهازك يدعمه)'; }
+    });
+    addEventListener('deviceorientation', onOri);
+    const move = e => { const r = pad.getBoundingClientRect(); tilt = clamp(((e.clientX - r.left) / r.width - 0.5) * 2.4, -1, 1); };
+    pad.addEventListener('pointerdown', e => { touch = true; pad.setPointerCapture(e.pointerId); move(e); });
+    pad.addEventListener('pointermove', e => { if (touch) move(e); });
+    for (const ev of ['pointerup', 'pointercancel']) pad.addEventListener(ev, () => { touch = false; if (!gyro) tilt = 0; });
+    const iv = setInterval(() => { send({ tilt }); knob.style.left = 50 + tilt * 40 + '%'; }, 50);
+    cleanup = () => { clearInterval(iv); removeEventListener('deviceorientation', onOri); };
+    return { enable, pad };
+  }
+
   const UI = {
     honeycomb(d) {
       const cv = h('canvas', { width: 520, height: 520 }), c = cv.getContext('2d'), msg = text('');
@@ -166,7 +186,7 @@
     bridge(d) {
       if (d.role !== 'runner') return cooldown('أطلق!', 'red', { fire: 1 });
       let tilt = 0, touch = false, gyro = false;
-      const mark = h('i'), meter = h('div', { class: 'meter' }, mark), pad = h('div', { class: 'pad' }, h('span', {}, 'لا يوجد ميلان؟ اسحب هنا يميناً ويساراً'), h('i')), knob = pad.lastChild;
+      const mark = h('i'), meter = h('div', { class: 'meter' }, mark), pad = h('div', { class: 'pad' }, h('span', {}, 'أو اسحب هنا يميناً ويساراً'), h('i')), knob = pad.lastChild;
       const onOri = e => { if (e.gamma == null) return; gyro = true; if (!touch) tilt = clamp(e.gamma / 30, -1, 1); };
       const enable = tap('فعّل التحكم بالميلان', 'green', b => {
         const D = window.DeviceOrientationEvent;
@@ -244,6 +264,31 @@
       const iv = setInterval(() => send({ jx, jy, fire }), 50);
       cleanup = () => clearInterval(iv);
       return { el: [info, pad, squirt], update: x => { info.textContent = 'حلقتك الورقية: ' + '◍ '.repeat(x.v.hp); } };
+    },
+
+    tug(d) {
+      const side = d.v.team ? 'الأيمن' : 'الأيسر';
+      if (d.v.ui === 'ready') return { el: waitScreen(`أنت في الفريق ${side}`, 'استعد… وحين تظهر الإشارة اضغط بأسرع ما تستطيع!') };
+      return { el: [text(`الفريق ${side} — اضغط بأسرع ما تستطيع!`, 'small'), h('div', { class: 'col' }, tap('اسحب!', 'big red', () => send({ tap: 1 })))] };
+    },
+
+    sumo(d) {
+      const v = d.v;
+      if (!v.mine) return { el: waitScreen('ليس دورك الآن.', 'تفرّج وشجّع على الشاشة الكبيرة.') };
+      if (v.phase === 'ready') return { el: waitScreen('دورك في الحلبة!', 'استعد… واضغط بأسرع ما تستطيع عند الإشارة.') };
+      if (v.phase === 'end') return { el: waitScreen(v.won ? 'فزت بالنزال!' : 'دُفعت خارج الحلبة.', '') };
+      return { el: [text('ادفع خصمك خارج الحلبة!', 'small'), h('div', { class: 'col' }, tap('ادفع!', 'big red', () => send({ tap: 1 })))] };
+    },
+
+    skittles(d) {
+      if (d.v.ui === 'down') return { el: waitScreen('طاخ! سقطت.', 'تابع البقية على الشاشة الكبيرة.') };
+      if (d.role === 'runner') {
+        const t = tiltPad('اسحب هنا يميناً ويساراً للتصويب والتوجيه'), info = text(''), roll = tap('ارمِ الكرة!', 'big green', () => send({ roll: 1 }));
+        roll.style.flex = '0 0 120px';
+        return { el: [info, t.pad, roll, t.enable], update: x => { roll.disabled = x.v.phase !== 'aim'; info.textContent = (x.v.phase === 'aim' ? 'صوّب ثم ارمِ' : 'وجّه الكرة وهي تتدحرج!') + ' · الكرات: ' + x.v.balls; } };
+      }
+      const t = tiltPad('أو اسحب هنا يميناً ويساراً');
+      return { el: [text('أنت قنّينة! أمِل جهازك يميناً ويساراً لتهرب من الكرة.', 'small'), t.enable, t.pad] };
     },
   };
 })();

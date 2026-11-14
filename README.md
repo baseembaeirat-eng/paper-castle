@@ -1,6 +1,6 @@
 # The Paper Castle
 
-A ten-game asymmetric party tournament. One shared 16:9 main screen, up to six
+A thirteen-game asymmetric party tournament. One shared 16:9 main screen, up to six
 players on their phones, joined by a four-letter room code. Everything on screen is
 drawn in code — vintage paper, watercolor washes, loose ink lines and a cast of
 Stickmen in mid-century hats. There are no image assets.
@@ -43,6 +43,9 @@ server/
     mushroom.js     8  Mushroom Trip      one-press release timing (everyone rides)
     hands.js        9  Show of Hands      first correct card wins the round
     showdown.js     10 Final Showdown     bumper carts, water, paper rings
+    tug.js          11 Tug of War         two teams, rapid tapping
+    sumo.js         12 Sumo Rings         one-on-one tapping bouts
+    skittles.js     13 Skittles           one bowler vs tilting human pins
 public/
   host.html         main screen (canvas, 1600x900 logical, letterboxed to 16:9)
   play.html/.css    phone controller

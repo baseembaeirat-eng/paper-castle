@@ -45,7 +45,7 @@ function newRoom() {
 }
 
 const vipOf = room => [...room.players.values()].find(p => p.on) || null;
-const gameList = GAMES.map((g, i) => ({ id: g.id, name: g.name, kind: g.kind, blurb: g.blurb, num: i + 1 }));
+const gameList = GAMES.map((g, i) => ({ id: g.id, name: g.name, kind: g.kind, tag: g.tag, blurb: g.blurb, num: i + 1 }));
 
 function startGame(room, gid) {
   const mod = BY_ID[gid];

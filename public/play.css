@@ -36,3 +36,6 @@ canvas{width:100%;display:block;touch-action:none}
 .menu{grid-template-columns:1fr 1fr}.menu button{font-size:16px;min-height:54px;padding:8px 6px}
 /* Arabic: text is RTL, but anything that mirrors the big screen keeps its left-to-right layout */
 .row,.grid,.pad,.meter,canvas{direction:ltr}.menu{direction:rtl}
+/* the game list is long: let it scroll, and pick on a full tap rather than on touch-down */
+.menu button{touch-action:pan-y;min-height:46px;font-size:15px}
+.pad span{font-size:19px;padding:0 10px}

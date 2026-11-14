@@ -328,5 +328,97 @@ const Scenes = (() => {
     },
   };
 
-  return { honeycomb, stones, bridge, knock, avalanche, rollers, dragon, mushroom, hands, showdown };
+  // 11 ── Tug of War ──────────────────────────────────────────────────────────────────
+  const tug = {
+    bg(c) {
+      A.wash(c, [[0, 600], [730, 600], [745, 900], [0, 900]], P.moss, 501, { alpha: 0.3, amp: 7 });
+      A.wash(c, [[870, 600], [1600, 600], [1600, 900], [855, 900]], P.moss, 502, { alpha: 0.3, amp: 7 });
+      A.wash(c, [[730, 612], [870, 612], [880, 900], [720, 900]], P.umber, 503, { alpha: 0.5, amp: 6 });
+      A.ink(c, [[0, 600], [730, 600], [735, 640]], 504, { w: 3.6 }); A.ink(c, [[1600, 600], [870, 600], [865, 640]], 505, { w: 3.6 });
+      for (let i = 0; i < 5; i++) A.ink(c, [[742 + i * 24, 640 + (i % 2) * 14], [760 + i * 24, 634 + (i % 2) * 14], [778 + i * 24, 642 + (i % 2) * 14]], 506 + i, { w: 2, alpha: 0.6 });
+      A.txt(c, 'الوحل', 800, 700, 30, { hand: true, color: P.cream, alpha: 0.9 });
+      const r = A.rng(507); for (let i = 0; i < 30; i++) { const x = r() < 0.5 ? r() * 700 : 900 + r() * 700, y = 620 + r() * 260; A.ink(c, [[x, y], [x + 3, y - 16 - r() * 12]], 510 + i, { w: 1.6, color: P.moss, alpha: 0.8 }); }
+      A.ink(c, [[800, 600], [800, 380]], 540, { w: 3, color: P.umber, alpha: 0.5 });
+    },
+    draw(c, v, S) {
+      const done = v.winner !== undefined && v.winner >= 0, drag = done ? Math.min(1, S.pt * 1.5) * 150 * (v.winner ? 1 : -1) : 0;
+      const off = v.pos * 260 + drag, pulling = v.phase === 'pull' && !done, y = 600;
+      const xs = [v.teams[0].map((_, i) => 800 - 330 - i * 95 + off), v.teams[1].map((_, i) => 800 + 330 + i * 95 + off)];
+      const x0 = Math.min(...xs[0]) - 50, x1 = Math.max(...xs[1]) + 50, wob = pulling ? Math.sin(S.t * 30) * 2 : 0;
+      A.ink(c, [[x0, y - 52 + wob], [800 + off, y - 46 - wob], [x1, y - 52 + wob]], 541 + Math.floor(S.t * 8), { w: 6, color: P.umber, amp: 1.2 });
+      A.wash(c, [[800 + off, y - 46], [800 + off - 26, y - 20], [800 + off + 26, y - 20]], P.brick, 542, { alpha: 0.7, amp: 1.5 });
+      [0, 1].forEach(side => v.teams[side].forEach((id, i) => {
+        const x = xs[side][i], lost = done && v.winner !== side, inMud = lost && x > 715 && x < 885, ci = S.who(id).ci;
+        if (inMud) { ripples(c, x, 650, (S.t * 0.7 + i * 0.3) % 1, 550 + i); A.stick(c, x, 690, 0.95, { ci, emo: 'dizzy', pose: 'fall', rot: side ? -1.2 : 1.2, t: S.t + i }); }
+        else A.stick(c, x, y, 0.95, { ci, dir: side ? 'left' : 'right', emo: lost ? 'shock' : done ? 'happy' : pulling ? 'grit' : 'smug', pose: done && !lost ? 'cheer' : pulling ? 'run' : 'stand', rot: done ? 0 : side ? 0.32 : -0.32, t: S.t * (pulling ? 1.6 : 1) + i });
+        tag(c, S, id, x, y + 34, 24);
+      }));
+      A.txt(c, 'الفريق الأيسر', 250, 190, 36, { bold: true }); A.txt(c, 'الفريق الأيمن', 1350, 190, 36, { bold: true });
+      if (v.phase === 'ready') A.txt(c, `استعدّوا… ${Math.ceil(v.t)}`, 800, 300, 80, { bold: true });
+      else if (!done) A.txt(c, 'اسحبوا!', 800, 300, 80 + Math.sin(S.t * 12) * 6, { bold: true, color: P.brick });
+    },
+  };
+
+  // 12 ── Sumo Rings ──────────────────────────────────────────────────────────────────
+  const sumo = {
+    bg(c) {
+      A.wash(c, [[0, 760], [1600, 760], [1600, 900], [0, 900]], P.umber, 561, { alpha: 0.22, amp: 8 });
+      A.wash(c, [[400, 640], [1200, 640], [1290, 770], [310, 770]], P.sand, 562, { alpha: 0.5, amp: 5 }); A.ink(c, [[400, 640], [1200, 640], [1290, 770], [310, 770]], 563, { closed: true, w: 3.6 });
+      A.ink(c, A.circ(800, 642, 372, 26, 22), 564, { closed: true, w: 7, color: P.ochre, amp: 2 }); A.ink(c, A.circ(800, 642, 372, 26, 22), 565, { closed: true, w: 1.8 });
+      A.ink(c, [[770, 648], [770, 658]], 566, { w: 4 }); A.ink(c, [[830, 648], [830, 658]], 567, { w: 4 });
+      A.wash(c, [[250, 96], [1350, 96], [1300, 150], [300, 150]], P.plum, 568, { alpha: 0.4, amp: 5 }); A.ink(c, [[250, 96], [1350, 96], [1300, 150], [300, 150]], 569, { closed: true, w: 3 });
+      for (let i = 0; i < 4; i++) A.ink(c, [[420 + i * 250, 150], [420 + i * 250, 185]], 570 + i, { w: 3, color: P.brick });
+    },
+    draw(c, v, S) {
+      const A1 = S.who(v.a), B1 = S.who(v.b), end = v.phase === 'end', k = end ? Math.min(1, (3 - v.t) * 1.4) : 0;
+      const cx = 800 + v.pos * 310, y = 638, fight = v.phase === 'fight', aLost = end && v.winner !== v.a, bLost = end && v.winner !== v.b;
+      const one = (who, x, side, lost, edge) => {
+        if (lost) A.stick(c, x + side * k * 190, y + k * k * 150, 1.5, { ci: who.ci, emo: 'shock', pose: 'fall', rot: side * k * 2.2, t: S.t });
+        else A.stick(c, x, y, 1.5, { ci: who.ci, dir: side < 0 ? 'right' : 'left', emo: end ? 'happy' : edge ? 'scared' : 'grit', pose: end ? 'cheer' : fight ? 'run' : 'stand', rot: end ? 0 : -side * 0.16, t: S.t * (fight ? 1.5 : 1) });
+      };
+      one(A1, cx - 62, -1, aLost, v.pos < -0.6); one(B1, cx + 62, 1, bLost, v.pos > 0.6);
+      A.txt(c, `النزال ${v.i + 1} من ${v.n}`, 800, 124, 34, { bold: true, color: P.cream, alpha: 1 });
+      A.txt(c, B1.name, 1150, 240, 54, { bold: true, color: A.PCOL[B1.ci] || A.INK }); A.txt(c, 'ضد', 800, 240, 34, { hand: true }); A.txt(c, A1.name, 450, 240, 54, { bold: true, color: A.PCOL[A1.ci] || A.INK });
+      if (v.phase === 'ready') A.txt(c, `استعدّوا… ${Math.ceil(v.t)}`, 800, 340, 64, { bold: true });
+      else if (fight) A.txt(c, 'ادفع!', 800, 340, 70 + Math.sin(S.t * 12) * 5, { bold: true, color: P.brick });
+      else A.txt(c, `${S.who(v.winner).name} يفوز بالنزال!`, 800, 340, 60, { bold: true, color: P.moss });
+      const crowd = S.ids.filter(id => id !== v.a && id !== v.b);
+      crowd.forEach((id, i) => { const x = 800 + (i - (crowd.length - 1) / 2) * 150; A.stick(c, x, 890, 0.8, { ci: S.who(id).ci, dir: 'back', pose: fight || end ? 'cheer' : 'stand', t: S.t + i }); });
+    },
+  };
+
+  // 13 ── Skittles ────────────────────────────────────────────────────────────────────
+  const skittles = {
+    bg(c) {
+      A.wash(c, A.rect(470, 110, 660, 740), P.sand, 581, { alpha: 0.45, amp: 5 }); A.ink(c, A.rect(470, 110, 660, 740), 582, { closed: true, w: 3.6 });
+      for (let x = 536; x < 1130; x += 66) A.ink(c, [[x, 114], [x + 2, 846]], 583 + x, { w: 1.2, alpha: 0.35 });
+      A.wash(c, A.rect(432, 110, 38, 740), P.soot, 590, { alpha: 0.45, amp: 3 }); A.wash(c, A.rect(1130, 110, 38, 740), P.soot, 591, { alpha: 0.45, amp: 3 });
+      A.ink(c, [[470, 790], [1130, 790]], 592, { w: 3, color: P.brick });
+      for (let i = 0; i < 7; i++) A.ink(c, [[560 + i * 80, 700], [560 + i * 80, 730]], 593 + i, { w: 3, alpha: 0.4 });
+    },
+    draw(c, v, S) {
+      const down = v.pins.filter(p => !p.up).length;
+      v.pins.forEach((p, i) => {
+        const x = 800 + p.x * 300, y = 250, ci = S.who(p.id).ci;
+        if (p.up) {
+          A.wash(c, A.circ(x, y - 52, 30, 14, 62), P.cream, 600 + i, { alpha: 0.75, amp: 2 }); A.ink(c, A.circ(x, y - 52, 30, 14, 62), 610 + i + Math.floor(S.t * 6), { closed: true, w: 2.6, amp: 1.2 });
+          A.ink(c, [[x - 22, y - 88], [x + 22, y - 88]], 620 + i, { w: 4, color: P.brick });
+          A.stick(c, x, y, 0.8, { ci, emo: v.phase === 'roll' && Math.abs(p.x - v.ball.x) < 0.45 ? 'shock' : 'scared', pose: 'cling', t: S.t + i });
+        } else A.stick(c, x, y + 10, 0.8, { ci, emo: 'dizzy', pose: 'fall', rot: Math.PI / 2, t: S.t + i, alpha: 0.75 });
+        tag(c, S, p.id, x, y + 36, 22);
+      });
+      const bx = 800 + v.ball.x * 300, by = 780 - v.ball.y * 600;
+      if (v.ball.y < 1.1) {
+        A.wash(c, A.circ(bx, by, 75, 18), P.soot, 630, { alpha: 0.62, amp: 3 }); A.ink(c, A.circ(bx, by, 75, 18), 631 + Math.floor(S.t * 6), { closed: true, w: 3.6, amp: 1.5 });
+        for (let k = 0; k < 3; k++) { const a = v.ball.y * 14 + k * 0.7; A.wash(c, A.circ(bx + Math.cos(a) * 34, by + Math.sin(a) * 34, 9, 8), P.cream, 632 + k, { alpha: 0.7, amp: 1 }); }
+      }
+      A.stick(c, v.phase === 'aim' ? bx : 800, 892, 1.1, { ci: S.who(S.runnerId).ci, dir: 'back', pose: v.phase === 'aim' ? 'stand' : 'cheer', emo: 'grit', t: S.t });
+      A.txt(c, 'الكرات: ' + '● '.repeat(v.balls), 60, 200, 30, { hand: true, align: 'left' });
+      A.txt(c, `المطلوب إسقاط ${v.need} · سقط ${down}`, 60, 250, 30, { hand: true, align: 'left' });
+      if (v.strike && v.phase !== 'aim') A.txt(c, v.pins.every(p => !p.up) ? 'ضربة كاملة!' : `طاخ! سقط ${v.strike}`, 1370, 300, 54, { bold: true, color: P.brick, rot: 0.1 });
+      else if (v.phase === 'pause') A.txt(c, 'نجَوا!', 1370, 300, 54, { bold: true, color: P.moss, rot: 0.1 });
+    },
+  };
+
+  return { honeycomb, stones, bridge, knock, avalanche, rollers, dragon, mushroom, hands, showdown, tug, sumo, skittles };
 })();

@@ -43,6 +43,8 @@ const SoundManager = (() => {
     win: 'win.mp3',              // cheering
     lose: 'lose.mp3',            // sad trombone
     champion: 'champion.mp3',
+    strike: 'strike.mp3',        // bowling pins going down
+    cheer: 'cheer.mp3',          // crowd reaction
     'bgm-lobby': 'bgm-lobby.mp3', // calm loop
     'bgm-game': 'bgm-game.mp3',   // high-energy loop
   };
@@ -138,6 +140,8 @@ const SoundManager = (() => {
     hit: () => noise(0.22, { type: 'bandpass', f: 1500, to: 500, vol: 0.34 }),
     win: () => tune([523, 659, 784, 1047], 0.12),
     lose: () => tune([392, 330, 262], 0.2, { len: 0.4 }),
+    strike: () => { noise(0.12, { f: 2600, type: 'bandpass', vol: 0.5 }); [0.05, 0.11, 0.16, 0.24, 0.33].forEach((at, i) => { tone(620 - i * 60, 0.09, { type: 'square', vol: 0.16, at }); noise(0.06, { f: 1800, vol: 0.3, at }); }); tone(90, 0.3, { to: 50, vol: 0.5 }); },
+    cheer: () => { noise(1.3, { type: 'bandpass', f: 900, to: 1500, q: 0.7, vol: 0.3, attack: 0.25 }); [0.1, 0.35, 0.6].forEach(at => tone(700 + at * 400, 0.25, { to: 1100 + at * 300, type: 'triangle', vol: 0.07, at })); },
     champion: () => tune([523, 523, 659, 784, 659, 784, 1047], 0.15, { len: 0.35 }),
   };
   function play(name) {
